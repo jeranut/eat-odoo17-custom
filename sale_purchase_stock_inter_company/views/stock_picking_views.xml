@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="stock_picking_form_reverse_intercompany" model="ir.ui.view">
+        <field name="name">stock.picking.form.reverse.intercompany</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.view_picking_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='origin']" position="after">
+                <field name="intercompany_source_delivery_id" readonly="1"/>
+                <field name="intercompany_receipt_prepared" readonly="1"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

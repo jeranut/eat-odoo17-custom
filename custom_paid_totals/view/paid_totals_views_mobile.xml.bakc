@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Tree view -->
+    <record id="view_account_daily_balance_mobile_tree" model="ir.ui.view">
+        <field name="name">account.daily.balance.mobile.tree</field>
+        <field name="model">account.daily.balance.mobile</field>
+        <field name="arch" type="xml">
+            <tree string="Totaux Mobile">
+                <field name="date"/>
+                <field name="company_id"/>
+                <field name="ancien_solde"/>
+                <field name="total_credit"/>
+                <field name="total_debit"/>
+                <field name="nouveau_solde"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="action_regule_mobile_wizard" model="ir.actions.act_window">
+        <field name="name">Wizard Régule Mobile</field>
+        <field name="res_model">regule.mobile.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+    <!-- Form view -->
+    <record id="view_account_daily_balance_mobile_form" model="ir.ui.view">
+        <field name="name">account.daily.balance.mobile.form</field>
+        <field name="model">account.daily.balance.mobile</field>
+        <field name="arch" type="xml">
+            <form string="Totaux Journaliers Mobile">
+                <header>
+
+                    <button name="action_update_totals_wizard_mobile" type="object" string="DEPOT"
+                            class="oe_highlight"/>
+                    <button name="action_open_retrait_wizard"
+                            type="object"
+                            string="RETRAIT"
+                            class="btn-success"/>
+                    <button name="action_update_totals_mobile" type="object" string="UPDATE"
+                            class="btn-success"/>
+                    <button name="%(action_regule_mobile_wizard)d"
+                            type="action"
+                            string="REGULE"
+                            class="btn-danger oe_highlight"
+                            context="{'default_balance_id': active_id}"/>
+                </header>
+
+                <sheet>
+                    <group>
+                        <field name="date"/>
+                        <field name="company_id" readonly="1"/>
+                        <field name="ancien_solde"/>
+                        <field name="total_credit"/>
+                        <field name="total_debit"/>
+                        <field name="nouveau_solde"/>
+                    </group>
+
+                    <separator string="Détails du jour"/>
+
+                    <field name="line_ids"
+                           nolabel="1"
+                           domain="[('balance_id', '=', id), ('company_id', '=', company_id)]">
+                        <tree create="false" edit="false" delete="false" default_order="id asc"
+                              decoration-danger="libelle == 'REGULE'" options="{'no_open': True}">
+                            <field name="regule_badge"
+                                   widget="badge"
+                                   string=""
+                                   decoration-danger="regule_badge == 'REGULE'"
+                                   width="50"/>
+                            <field name="categorie" string="Catégorie" width="100"/>
+                            <field name="reference"/>
+                            <field name="libelle"/>
+                            <field name="payment"/>
+                            <field name="debit"/>
+                            <field name="credit"/>
+                        </tree>
+                        <form string="Détails (Lecture seule)" create="false" edit="false">
+                            <group>
+                                <h3>Lecture seule</h3>
+                            </group>
+                        </form>
+
+                    </field>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Wizard recette -->
+    <record id="view_update_totals_mobile_wizard" model="ir.ui.view">
+        <field name="name">update.totals.mobile.wizard.form</field>
+        <field name="model">update.totals.mobile.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Ajouter RECETTE Mobile">
+                <group>
+                    <field name="balance_id" invisible="1"/>
+                    <field name="recette"/>
+                </group>
+                <footer>
+                    <button string="Confirmer" name="action_confirm" type="object" class="oe_highlight"/>
+                    <button string="Fermer" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Wizard solde initial -->
+    <record id="view_account_daily_balance_mobile_init_wizard" model="ir.ui.view">
+        <field name="name">account.daily.balance.mobile.init.wizard.form</field>
+        <field name="model">account.daily.balance.mobile.init.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Solde initial Mobile">
+                <group>
+                    <field name="balance_id" invisible="1"/>
+                    <field name="initial_balance"/>
+                </group>
+                <footer>
+                    <button string="Confirmer" name="action_confirm" type="object" class="oe_highlight"/>
+                    <button string="Fermer" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Wizard régule -->
+    <record id="view_regule_mobile_wizard" model="ir.ui.view">
+        <field name="name">regule.mobile.wizard.form</field>
+        <field name="model">regule.mobile.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Réguler Mobile">
+                 <field name="balance_id" invisible="1"/>
+                 <field name="company_id" invisible="1"/>
+                <group>
+                    <field name="reference_id"
+                           domain="[('balance_id', '=', balance_id), ('company_id', '=', company_id)]"
+                           options="{'no_create': True, 'no_create_edit': True}"/>
+                    <field name="montant" readonly="1"/>
+                </group>
+                <footer>
+                    <button string="Confirmer Régule" name="action_confirm_regule" type="object" class="oe_highlight"/>
+                    <button string="Fermer" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+    <record id="view_retrait_wizard_form" model="ir.ui.view">
+        <field name="name">retrait.wizard.form</field>
+        <field name="model">retrait.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Retrait Mobile Money">
+                <group>
+                    <field name="reference" readonly="1"/>
+                    <field name="motif"/>
+                    <field name="montant"/>
+                </group>
+                <footer>
+                    <button string="Annuler" class="btn-secondary" special="cancel"/>
+                    <button string="Confirmer" type="object"
+                            name="action_confirm_retrait"
+                            class="btn-primary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+    <record id="action_paid_daily_total_mobile" model="ir.actions.act_window">
+        <field name="name">Totaux Journaliers Mobile</field>
+        <field name="res_model">account.daily.balance.mobile</field>
+        <field name="view_mode">tree,form</field>
+        <field name="domain">[('company_id','in',context.get('allowed_company_ids', []))]</field>
+    </record>
+    <!-- JOURNAL MOBILE MONEY -->
+    <menuitem id="menu_mobile_journal"
+              name="Journal Mobile Money"
+              parent="menu_paid_totals_list"
+              action="action_paid_daily_total_mobile"
+              sequence="2"/>
+
+</odoo>

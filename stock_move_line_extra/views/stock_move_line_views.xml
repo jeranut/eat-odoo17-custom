@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ======================================================
+         Tree view principale pour stock.move.line
+    ====================================================== -->
+    <record id="view_stock_move_line_history_tree" model="ir.ui.view">
+        <field name="name">stock.move.line.history.tree</field>
+        <field name="model">stock.move.line</field>
+        <field name="arch" type="xml">
+            <tree string="Historique des Mouvements" create="0" edit="0">
+                <field name="date"/>
+                <field name="product_id"/>
+                <field name="location_id" string="De"/>
+                <field name="location_dest_id" string="Vers"/>
+                <field name="quantity" string="Qté" context="{'tree_view_ref':'stock.move.line'}"/>
+                <field name="product_uom_category_id" invisible="1"/>
+                <field name="product_uom_id" string="UNIT"/>
+                <field name="stock_initial" string="SI" optional="show"/>
+                <field name="stock_final" string="SF" optional="show"/>
+            </tree>
+        </field>
+    </record>
+
+    <!-- ======================================================
+         Form view principale
+    ====================================================== -->
+    <record id="view_stock_move_line_history_form_with_header" model="ir.ui.view">
+        <field name="name">stock.move.line.history.form.with.header</field>
+        <field name="model">stock.move.line</field>
+        <field name="arch" type="xml">
+            <form string="Historique des Mouvements">
+                <field name="company_id" invisible="1"/>
+                <sheet>
+                    <group>
+                        <field name="date"/>
+                        <field name="product_id"/>
+                        <field name="location_id" string="De"/>
+                        <field name="location_dest_id" string="Vers"/>
+                        <field name="quantity" string="Qté"/>
+                        <field name="product_uom_category_id" invisible="1"/>
+                        <field name="product_uom_id" string="UNIT"/>
+                        <field name="stock_initial" string="SI"/>
+                        <field name="stock_final" string="SF"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ======================================================
+         Kanban view compacte avec ratio UoM du produit
+    ====================================================== -->
+    <record id="view_stock_move_line_kanban" model="ir.ui.view">
+        <field name="name">stock.move.line.kanban.compact</field>
+        <field name="model">stock.move.line</field>
+        <field name="arch" type="xml">
+            <kanban>
+                <field name="product_id"/>
+                <field name="quantity"/>
+                <field name="product_uom_category_id" invisible="1"/>
+                <field name="product_uom_id"/>
+                <field name="uom_ratio"/>
+                <field name="location_id"/>
+                <field name="location_dest_id"/>
+                <field name="stock_initial"/>
+                <field name="stock_final"/>
+                <templates>
+                    <t t-name="kanban-box">
+                        <div class="oe_kanban_card"
+                             style="padding:6px; border-radius:6px; border:1px solid #ddd; line-height:1.4em; background-color:#fafafa;">
+
+                            <!-- Produit et Ratio -->
+                            <div style="font-weight:bold; font-size:1em; margin-bottom:2px;">
+                                <field name="product_id"/>
+                                <span style="background-color:#e0e0e0; color:#333; padding:1px 5px; border-radius:4px; font-weight:normal; margin-left:4px;">
+                                    Ratio:
+                                    <field name="uom_ratio"/>
+                                </span>
+                            </div>
+
+                            <!-- Quantité et UoM avec espace -->
+                            <div style="margin-bottom:2px;">
+                                <span style="font-weight:bold; color:#721c24;">Qté:
+                                    <field name="quantity"/>
+                                </span>
+                                <span style="margin-left:4px;">
+                                    <field name="product_uom_id"/>
+                                </span>
+                            </div>
+
+                            <!-- Emplacements -->
+                            <div style="margin-bottom:2px;">
+                                <strong>De:</strong>
+                                <field name="location_id"/>
+                                <strong>Vers:</strong>
+                                <field name="location_dest_id"/>
+                            </div>
+
+                            <!-- Stocks SI / SF -->
+                            <div>
+                                <span style="background-color:#d4edda; color:#155724; padding:2px 6px; border-radius:4px; font-weight:bold;">
+                                    SI:
+                                    <field name="stock_initial"/>
+                                </span>
+                                <span style="margin-left:6px; background-color:#cce5ff; color:#004085; padding:2px 6px; border-radius:4px; font-weight:bold;">
+                                    SF:
+                                    <field name="stock_final"/>
+                                </span>
+                            </div>
+
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+
+    <!-- ======================================================
+         Wizard pour filtrer les mouvements
+    ====================================================== -->
+    <record id="view_stock_move_line_filter_wizard" model="ir.ui.view">
+        <field name="name">stock.move.line.filter.wizard.form</field>
+        <field name="model">stock.move.line.filter.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Filtrer les mouvements">
+                <group>
+                    <field name="product_id"/>
+                    <field name="date_from"/>
+                    <field name="date_to"/>
+                </group>
+                <footer>
+                    <button string="Appliquer filtre" type="object" name="apply_filter" class="btn-primary"/>
+                    <button string="Annuler" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- ======================================================
+         Search view corrigée pour stock.move.line
+    ====================================================== -->
+    <record id="view_stock_move_line_search" model="ir.ui.view">
+        <field name="name">stock.move.line.search.custom</field>
+        <field name="model">stock.move.line</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="product_id" string="Produit"/>
+                <field name="date"/>
+                <field name="location_id"/>
+                <field name="location_dest_id"/>
+                <filter string="Catégorie" name="group_by_categ" context="{'group_by':'product_categ_id'}"/>
+            </search>
+        </field>
+    </record>
+
+
+    <!-- ======================================================
+         Action principale
+    ====================================================== -->
+    <record id="action_stock_move_line_history" model="ir.actions.act_window">
+        <field name="name">Historique des Mouvements</field>
+        <field name="res_model">stock.move.line</field>
+        <field name="view_mode">tree,form</field>
+        <field name="view_id" ref="view_stock_move_line_history_tree"/>
+        <field name="search_view_id" ref="view_stock_move_line_search"/> <!-- Search view valide -->
+        <field name="context">{'group_by': ['product_categ_id', 'date_month', 'date_day']}</field>
+    </record>
+
+    <!-- ======================================================
+         Action pour ouvrir le wizard
+    ====================================================== -->
+    <record id="action_stock_move_line_filter_wizard" model="ir.actions.act_window">
+        <field name="name">Filtrer Mouvements</field>
+        <field name="res_model">stock.move.line.filter.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+    <record id="action_stock_move_line_kanban_filtered" model="ir.actions.act_window">
+        <field name="name">Historique Kanban Filtré</field>
+        <field name="res_model">stock.move.line</field>
+        <field name="view_mode">kanban</field>
+        <field name="view_id" ref="view_stock_move_line_kanban"/>
+    </record>
+
+    <!-- ======================================================
+         Menus
+    ====================================================== -->
+    <menuitem id="menu_stock_history_custom"
+              name="Historique STOCK"
+              parent="stock.menu_warehouse_report"
+              action="action_stock_move_line_history"
+              sequence="50"/>
+
+    <menuitem id="menu_stock_history_filter"
+              name="Historique PRODUIT"
+              parent="stock.menu_warehouse_report"
+              action="action_stock_move_line_filter_wizard"
+              sequence="51"/>
+
+</odoo>

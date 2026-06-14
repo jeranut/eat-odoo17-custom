@@ -1,0 +1,16 @@
+<odoo>
+    <record id="view_mrp_production_form_xprinter" model="ir.ui.view">
+        <field name="name">mrp.production.form.xprinter</field>
+        <field name="model">mrp.production</field>
+        <field name="inherit_id" ref="mrp.mrp_production_form_view"/>
+        <field name="arch" type="xml">
+            <header position="inside">
+                <button name="action_print_xprinter"
+                        string="Imprimer OF"
+                        type="object"
+                        class="oe_highlight"
+                        icon="fa-print"/>
+            </header>
+        </field>
+    </record>
+</odoo>

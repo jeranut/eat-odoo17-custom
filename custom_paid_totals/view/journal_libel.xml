@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_account_move_form_inherit_journal_label" model="ir.ui.view">
+        <field name="name">account.move.form.journal.label.inherit</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_move_form"/>
+        <field name="arch" type="xml">
+
+            <xpath expr="//field[@name='payment_reference']" position="after">
+                <field name="journal_label"
+                       string="Libellé du journal"
+                       placeholder="FACTURE OEUF RASOA"
+                       required="1"
+                       style="width:260px;"/>
+            </xpath>
+
+        </field>
+    </record>
+
+
+</odoo>

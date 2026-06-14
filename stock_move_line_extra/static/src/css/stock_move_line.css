@@ -1,0 +1,4 @@
+/* Masque les colonnes De / Vers si checkbox désactivée */
+.o_list_view .o_list_row .o_field_boolean[name="show_move_columns"]:not(:checked) ~ .o_col_show_move {
+    display: none;
+}
