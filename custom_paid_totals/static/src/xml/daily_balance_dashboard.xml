@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="custom_paid_totals.DailyBalanceDashboard">
+        <section class="daily-balance-chart-dashboard">
+            <div class="daily-balance-dashboard-header">
+                <h3 t-out="title"/>
+                <div class="period-selector" role="radiogroup" aria-label="Période">
+                    <label>
+                        <input type="radio"
+                               name="daily-balance-period"
+                               value="day"
+                               t-att-checked="state.period === 'day'"
+                               t-on-change="() => this.setPeriod('day')"/>
+                        Jour
+                    </label>
+                    <label>
+                        <input type="radio"
+                               name="daily-balance-period"
+                               value="month"
+                               t-att-checked="state.period === 'month'"
+                               t-on-change="() => this.setPeriod('month')"/>
+                        Mois
+                    </label>
+                </div>
+            </div>
+
+            <div class="chart-tabs" role="tablist">
+                <button type="button"
+                        role="tab"
+                        t-att-class="state.activeTab === 'expenses' ? 'active' : ''"
+                        t-on-click="() => this.setActiveTab('expenses')">
+                    Dépenses
+                </button>
+                <button type="button"
+                        role="tab"
+                        t-att-class="state.activeTab === 'sales' ? 'active' : ''"
+                        t-on-click="() => this.setActiveTab('sales')">
+                    Ventes
+                </button>
+            </div>
+
+            <div class="chart-container">
+                <div t-if="state.loading" class="daily-balance-dashboard-message">
+                    Chargement...
+                </div>
+                <div t-elif="state.error" class="daily-balance-dashboard-message text-danger">
+                    Impossible de charger les données.
+                </div>
+                <div t-elif="!hasData" class="daily-balance-dashboard-message">
+                    Aucune donnée à afficher
+                </div>
+                <div t-else="" t-ref="chart" class="daily-balance-apex-chart"/>
+            </div>
+        </section>
+    </t>
+</templates>

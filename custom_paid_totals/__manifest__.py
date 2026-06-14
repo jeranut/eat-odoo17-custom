@@ -18,6 +18,10 @@
     'assets': {
         'web.assets_backend': [
             'custom_paid_totals/static/src/scss/icon.scss',
+            'custom_paid_totals/static/lib/apexcharts/apexcharts.min.js',
+            'custom_paid_totals/static/src/js/daily_balance_dashboard.js',
+            'custom_paid_totals/static/src/xml/daily_balance_dashboard.xml',
+            'custom_paid_totals/static/src/scss/daily_balance_dashboard.scss',
         ],
     },
     'installable': True,

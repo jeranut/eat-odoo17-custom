@@ -62,19 +62,48 @@
                 </header>
 
                 <sheet>
-                    <group>
-                        <field name="date"/>
-                    </group>
-
-                    <group>
-                        <field name="company_id" readonly="1"/>
-                        <field name="ancien_solde" readonly="1"/>
-                        <field name="total_debit" readonly="1"/>
-                        <field name="total_credit" readonly="1"/>
-                        <field name="nouveau_solde" readonly="1"/>
-                    </group>
+                    <field name="company_currency_id" invisible="1"/>
+                    <div class="daily-balance-summary">
+                        <div class="daily-balance-summary-item">
+                            <strong>Date :</strong>
+                            <field name="date" nolabel="1" readonly="1"/>
+                        </div>
+                        <div class="daily-balance-summary-item">
+                            <strong>Company :</strong>
+                            <field name="company_id" nolabel="1" readonly="1"/>
+                        </div>
+                        <div class="daily-balance-summary-item">
+                            <strong>Ancien solde :</strong>
+                            <field name="ancien_solde" nolabel="1" readonly="1"
+                                   widget="monetary"
+                                   options="{'currency_field': 'company_currency_id'}"/>
+                        </div>
+                        <div class="daily-balance-summary-item">
+                            <strong>Total Dépense :</strong>
+                            <field name="total_debit" nolabel="1" readonly="1"
+                                   widget="monetary"
+                                   options="{'currency_field': 'company_currency_id'}"/>
+                        </div>
+                        <div class="daily-balance-summary-item">
+                            <strong>Total Vente :</strong>
+                            <field name="total_credit" nolabel="1" readonly="1"
+                                   widget="monetary"
+                                   options="{'currency_field': 'company_currency_id'}"/>
+                        </div>
+                        <div class="daily-balance-summary-item">
+                            <strong>Nouveau solde :</strong>
+                            <field name="nouveau_solde" nolabel="1" readonly="1"
+                                   widget="monetary"
+                                   options="{'currency_field': 'company_currency_id'}"/>
+                        </div>
+                    </div>
 
                     <field name="show_lines" invisible="1"/>
+                    <field name="show_lines"
+                           widget="daily_balance_dashboard"
+                           class="daily-balance-dashboard-field"
+                           nolabel="1"
+                           readonly="1"/>
 
                     <separator string="Détails du jour"/>
 
@@ -96,6 +125,8 @@
                             <field name="id" string="ID" width="40"/>
                             <field name="categorie" string="Catégorie" width="100"/>
                             <field name="reference"/>
+                            <field name="payment_date"/>
+                            <field name="journal_id"/>
                             <field name="libelle"/>
                             <field name="payment"/>
                             <field name="debit"/>
@@ -133,6 +164,25 @@
                        options="{'badge_success': ['ouvert'], 'badge_danger': ['cloturer']}"/>
             </tree>
 
+        </field>
+    </record>
+
+    <record id="view_account_daily_balance_line_dashboard_tree" model="ir.ui.view">
+        <field name="name">account.daily.balance.line.dashboard.tree</field>
+        <field name="model">account.daily.balance.line</field>
+        <field name="arch" type="xml">
+            <tree string="Documents d'origine" create="false" edit="false" delete="false">
+                <field name="balance_id"/>
+                <field name="reference"/>
+                <field name="libelle"/>
+                <field name="move_id" string="Facture d'origine"/>
+                <field name="payment_id" string="Paiement d'origine"/>
+                <field name="expense_id" string="Dépense d'origine"/>
+                <field name="journal_id"/>
+                <field name="payment_date"/>
+                <field name="debit"/>
+                <field name="credit"/>
+            </tree>
         </field>
     </record>
 

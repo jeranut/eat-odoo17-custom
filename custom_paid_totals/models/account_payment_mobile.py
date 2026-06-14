@@ -1,12 +1,11 @@
-from odoo import models, api, _
+from odoo import models, api, fields, _
 from odoo.exceptions import UserError
-from datetime import date
 
 class AccountPaymentRegister(models.TransientModel):
     _inherit = "account.payment.register"
 
     def action_create_payments(self):
-        today = date.today()
+        payment_date = self.payment_date or fields.Date.context_today(self)
 
         # ───────────────
         # Paiement fournisseur CASH
@@ -38,15 +37,19 @@ class AccountPaymentRegister(models.TransientModel):
         # ───────────────
         # Paiement fournisseur MOBILE MONEY
         # ───────────────
-        if (
-            self.payment_type == "outbound"
-            and self.partner_type == "supplier"
-            and self.journal_id.type == "bank"
-            and self.journal_id.name.strip().lower() == "mobile money"
-        ):
+        operator = self.env['mobile.money.operator'].search([
+            ('journal_id', '=', self.journal_id.id),
+            ('company_id', '=', self.company_id.id),
+            ('active', '=', True),
+        ], limit=1)
+        if self.payment_type == "outbound" and self.partner_type == "supplier" and operator:
             # Récupération du dernier solde Mobile Money
             last_balance = self.env['account.daily.balance.mobile'].search(
-                [('company_id', '=', self.company_id.id)],
+                [
+                    ('company_id', '=', self.company_id.id),
+                    ('operator_id', '=', operator.id),
+                    ('date', '<=', payment_date),
+                ],
                 order='date desc',
                 limit=1
             )
@@ -54,8 +57,9 @@ class AccountPaymentRegister(models.TransientModel):
             # Créer la balance si elle n'existe pas ou si elle est clôturée
             if not last_balance or last_balance.etats == 'cloturer':
                 last_balance = self.env['account.daily.balance.mobile'].create({
-                    'date': today,
+                    'date': payment_date,
                     'company_id': self.company_id.id,
+                    'operator_id': operator.id,
                     'ancien_solde': last_balance.nouveau_solde if last_balance else 0.0
                 })
 

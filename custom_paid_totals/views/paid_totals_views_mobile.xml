@@ -5,8 +5,9 @@
         <field name="name">account.daily.balance.mobile.tree</field>
         <field name="model">account.daily.balance.mobile</field>
         <field name="arch" type="xml">
-            <tree string="Totaux Mobile">
+            <tree string="Multi Mobile Money">
                 <field name="date"/>
+                <field name="operator_id"/>
                 <field name="company_id"/>
                 <field name="ancien_solde"/>
                 <field name="total_credit"/>
@@ -29,33 +30,82 @@
         <field name="name">account.daily.balance.mobile.form</field>
         <field name="model">account.daily.balance.mobile</field>
         <field name="arch" type="xml">
-            <form string="Totaux Journaliers Mobile">
+            <form string="Multi Mobile Money">
                 <header>
 
                     <button name="action_update_totals_wizard_mobile" type="object" string="DEPOT"
-                            class="oe_highlight"/>
+                            class="oe_highlight"
+                            invisible="etats == 'cloturer'"/>
                     <button name="action_open_retrait_wizard"
                             type="object"
                             string="RETRAIT"
-                            class="btn-success"/>
+                            class="btn-success"
+                            invisible="etats == 'cloturer'"/>
                     <button name="action_update_totals_mobile" type="object" string="UPDATE"
-                            class="btn-success"/>
+                            class="btn-success"
+                            invisible="etats == 'cloturer'"/>
                     <button name="%(action_regule_mobile_wizard)d"
                             type="action"
                             string="REGULE"
                             class="btn-danger oe_highlight"
+                            invisible="etats == 'cloturer'"
                             context="{'default_balance_id': active_id}"/>
+                    <field name="etats" widget="statusbar"
+                           statusbar_visible="ouvert,cloturer"/>
                 </header>
 
                 <sheet>
-                    <group>
-                        <field name="date"/>
-                        <field name="company_id" readonly="1"/>
-                        <field name="ancien_solde"/>
-                        <field name="total_credit"/>
-                        <field name="total_debit"/>
-                        <field name="nouveau_solde"/>
-                    </group>
+                    <field name="company_currency_id" invisible="1"/>
+                    <div class="daily-balance-summary">
+                        <div class="daily-balance-summary-item">
+                            <strong>Date :</strong>
+                            <field name="date" nolabel="1" readonly="1"/>
+                        </div>
+                        <div class="daily-balance-summary-item">
+                            <strong>Company :</strong>
+                            <field name="company_id" nolabel="1" readonly="1"/>
+                        </div>
+                        <div class="daily-balance-summary-item">
+                            <strong>Journal :</strong>
+                            <field name="operator_id"
+                                   nolabel="1"
+                                   required="1"
+                                   readonly="id"
+                                   domain="[('company_id', '=', company_id)]"
+                                   options="{'no_create': True}"/>
+                        </div>
+                        <div class="daily-balance-summary-item">
+                            <strong>Ancien solde :</strong>
+                            <field name="ancien_solde" nolabel="1" readonly="1"
+                                   widget="monetary"
+                                   options="{'currency_field': 'company_currency_id'}"/>
+                        </div>
+                        <div class="daily-balance-summary-item">
+                            <strong>Total Dépense :</strong>
+                            <field name="total_debit" nolabel="1" readonly="1"
+                                   widget="monetary"
+                                   options="{'currency_field': 'company_currency_id'}"/>
+                        </div>
+                        <div class="daily-balance-summary-item">
+                            <strong>Total Vente :</strong>
+                            <field name="total_credit" nolabel="1" readonly="1"
+                                   widget="monetary"
+                                   options="{'currency_field': 'company_currency_id'}"/>
+                        </div>
+                        <div class="daily-balance-summary-item">
+                            <strong>Nouveau solde :</strong>
+                            <field name="nouveau_solde" nolabel="1" readonly="1"
+                                   widget="monetary"
+                                   options="{'currency_field': 'company_currency_id'}"/>
+                        </div>
+                    </div>
+
+                    <field name="show_lines" invisible="1"/>
+                    <field name="show_lines"
+                           widget="daily_balance_dashboard"
+                           class="daily-balance-dashboard-field"
+                           nolabel="1"
+                           readonly="1"/>
 
                     <separator string="Détails du jour"/>
 
@@ -71,6 +121,8 @@
                                    width="50"/>
                             <field name="categorie" string="Catégorie" width="100"/>
                             <field name="reference"/>
+                            <field name="payment_date"/>
+                            <field name="journal_id"/>
                             <field name="libelle"/>
                             <field name="payment"/>
                             <field name="debit"/>
@@ -151,6 +203,8 @@
         <field name="model">retrait.wizard</field>
         <field name="arch" type="xml">
             <form string="Veuillez entrer la description et la référence de la transaction et le montant">
+                <field name="balance_id" invisible="1"/>
+                <field name="company_id" invisible="1"/>
                 <group>
                     <field name="reference" readonly="1"/>
                     <field name="motif"/>
@@ -166,16 +220,121 @@
         </field>
     </record>
     <record id="action_paid_daily_total_mobile" model="ir.actions.act_window">
-        <field name="name">Totaux Journaliers Mobile</field>
+        <field name="name">Multi Mobile Money</field>
         <field name="res_model">account.daily.balance.mobile</field>
+        <field name="view_mode">tree,form</field>
+        <field name="domain">[('company_id','in',context.get('allowed_company_ids', []))]</field>
+    </record>
+
+    <record id="view_account_daily_balance_mobile_line_dashboard_tree" model="ir.ui.view">
+        <field name="name">account.daily.balance.mobile.line.dashboard.tree</field>
+        <field name="model">account.daily.balance.mobile.line</field>
+        <field name="arch" type="xml">
+            <tree string="Documents d'origine Mobile Money" create="false" edit="false" delete="false">
+                <field name="balance_id"/>
+                <field name="operator_id"/>
+                <field name="reference"/>
+                <field name="libelle"/>
+                <field name="move_id" string="Facture d'origine"/>
+                <field name="payment_id" string="Paiement d'origine"/>
+                <field name="journal_id"/>
+                <field name="payment_date"/>
+                <field name="debit"/>
+                <field name="credit"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_account_daily_balance_mobile_search" model="ir.ui.view">
+        <field name="name">account.daily.balance.mobile.search</field>
+        <field name="model">account.daily.balance.mobile</field>
+        <field name="arch" type="xml">
+            <search string="Multi Mobile Money">
+                <field name="date"/>
+                <field name="operator_id"/>
+                <field name="company_id"/>
+                <filter string="Ouvertes" name="open" domain="[('etats', '=', 'ouvert')]"/>
+                <group expand="0" string="Regrouper par">
+                    <filter string="Opérateur" name="group_by_operator"
+                            context="{'group_by': 'operator_id'}"/>
+                    <filter string="Société" name="group_by_company"
+                            context="{'group_by': 'company_id'}"/>
+                    <filter string="Date" name="group_by_date"
+                            context="{'group_by': 'date'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_mobile_money_operator_tree" model="ir.ui.view">
+        <field name="name">mobile.money.operator.tree</field>
+        <field name="model">mobile.money.operator</field>
+        <field name="arch" type="xml">
+            <tree string="Opérateurs Mobile Money">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="journal_id"/>
+                <field name="company_id"/>
+                <field name="active"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_mobile_money_operator_form" model="ir.ui.view">
+        <field name="name">mobile.money.operator.form</field>
+        <field name="model">mobile.money.operator</field>
+        <field name="arch" type="xml">
+            <form string="Opérateur Mobile Money">
+                <sheet>
+                    <group>
+                        <field name="name"/>
+                        <field name="code"/>
+                        <field name="company_id"/>
+                        <field name="journal_id" required="1"
+                               domain="[('type', '=', 'bank'), ('company_id', '=', company_id)]"/>
+                        <field name="active"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_mobile_money_operator_search" model="ir.ui.view">
+        <field name="name">mobile.money.operator.search</field>
+        <field name="model">mobile.money.operator</field>
+        <field name="arch" type="xml">
+            <search string="Opérateurs Mobile Money">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="journal_id"/>
+                <field name="company_id"/>
+                <filter string="Archivés" name="inactive" domain="[('active', '=', False)]"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_mobile_money_operator" model="ir.actions.act_window">
+        <field name="name">Opérateurs Mobile Money</field>
+        <field name="res_model">mobile.money.operator</field>
         <field name="view_mode">tree,form</field>
         <field name="domain">[('company_id','in',context.get('allowed_company_ids', []))]</field>
     </record>
     <!-- JOURNAL MOBILE MONEY -->
     <menuitem id="menu_mobile_journal"
-              name="Journal Mobile Money"
+              name="Multi Mobile Money"
               parent="menu_paid_totals_list"
               action="action_paid_daily_total_mobile"
               sequence="2"/>
+
+    <menuitem id="menu_paid_totals_configuration"
+              name="Configuration"
+              parent="menu_paid_totals_main"
+              sequence="90"/>
+
+    <menuitem id="menu_mobile_money_operator"
+              name="Opérateurs Mobile Money"
+              parent="menu_paid_totals_configuration"
+              action="action_mobile_money_operator"
+              sequence="10"/>
 
 </odoo>

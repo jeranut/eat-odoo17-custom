@@ -2,6 +2,8 @@ from odoo import models, fields, api, _
 from odoo.exceptions import UserError
 from datetime import timedelta
 from datetime import datetime
+from collections import defaultdict
+from dateutil.relativedelta import relativedelta
 
 
 class AccountDailyBalance(models.Model):
@@ -52,6 +54,84 @@ class AccountDailyBalance(models.Model):
         # Mettre simplement la balance à l'état CLOTURER
         self.etat = 'cloturer'
         return True
+
+    def get_dashboard_chart_data(self, period='day'):
+        self.ensure_one()
+        if period not in ('day', 'month'):
+            raise UserError(_("La période du dashboard doit être 'day' ou 'month'."))
+
+        date_from = self.date
+        date_to = self.date
+        if period == 'month':
+            date_from = self.date.replace(day=1)
+            date_to = date_from + relativedelta(months=1, days=-1)
+
+        lines = self.env['account.daily.balance.line'].search([
+            ('company_id', '=', self.company_id.id),
+            ('balance_id.date', '>=', date_from),
+            ('balance_id.date', '<=', date_to),
+        ])
+        expenses = defaultdict(float)
+        sales = defaultdict(float)
+
+        for line in lines:
+            label = (
+                line.libelle
+                or line.reference
+                or _("Sans libellé")
+            )
+            if line.debit > 0:
+                expenses[label] += line.debit
+            if line.credit > 0:
+                sales[label] += line.credit
+
+        def chart_values(values):
+            ordered = sorted(values.items(), key=lambda item: item[1], reverse=True)
+            return {
+                'labels': [label for label, amount in ordered],
+                'series': [amount for label, amount in ordered],
+            }
+
+        return {
+            'expenses': chart_values(expenses),
+            'sales': chart_values(sales),
+            'currency': {
+                'symbol': self.company_currency_id.symbol or self.company_currency_id.name,
+                'position': self.company_currency_id.position,
+            },
+        }
+
+    def action_open_dashboard_lines(self, period, section, label):
+        self.ensure_one()
+        if period not in ('day', 'month') or section not in ('expenses', 'sales'):
+            raise UserError(_("Filtre du dashboard invalide."))
+
+        date_from = self.date
+        date_to = self.date
+        if period == 'month':
+            date_from = self.date.replace(day=1)
+            date_to = date_from + relativedelta(months=1, days=-1)
+
+        lines = self.env['account.daily.balance.line'].search([
+            ('company_id', '=', self.company_id.id),
+            ('balance_id.date', '>=', date_from),
+            ('balance_id.date', '<=', date_to),
+            ('debit' if section == 'expenses' else 'credit', '>', 0),
+        ]).filtered(
+            lambda line: (line.libelle or line.reference or _("Sans libellé")) == label
+        )
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _("%(label)s - lignes d'origine", label=label),
+            'res_model': 'account.daily.balance.line',
+            'view_mode': 'tree,form',
+            'views': [
+                (self.env.ref('custom_paid_totals.view_account_daily_balance_line_dashboard_tree').id, 'tree'),
+                (False, 'form'),
+            ],
+            'domain': [('id', 'in', lines.ids)],
+            'context': {'create': False, 'edit': False, 'delete': False},
+        }
 
     from odoo import models, fields, _
     from odoo.exceptions import UserError
@@ -204,131 +284,23 @@ class AccountDailyBalance(models.Model):
                 limit=1
             )
 
-            # Ajouter uniquement si la balance est ouverte
-            # ───────────────
-            # Factures clients CASH uniquement
-            # ───────────────
+            # Ajouter uniquement les paiements CASH de la date de la balance.
             if record.etat == 'ouvert':
-                # Dernière balance clôturée
-                last_closed_balance = self.search([
-                    ('company_id', '=', record.company_id.id),
-                    ('etat', '=', 'cloturer')
-                ], order='date desc', limit=1)
-
-                start_date = last_closed_balance.date if last_closed_balance else record.date
-
-                # Récupérer toutes les factures payées en cash depuis la dernière balance clôturée
-                client_invoices = self.env['account.move'].search([
-                    ('move_type', '=', 'out_invoice'),
-                    ('payment_state', '=', 'paid'),
+                invoices = self.env['account.move'].search([
+                    ('move_type', 'in', ('out_invoice', 'in_invoice')),
                     ('state', '=', 'posted'),
-                    ('invoice_date', '>=', start_date),
                     ('company_id', '=', record.company_id.id),
                 ])
-
-                total_credit = 0
-                for inv in client_invoices:
-                    payments = inv._get_reconciled_payments()
-                    payment = payments[0] if payments else False
-
-                    if not payment or payment.journal_id.type != "cash":
-                        continue
-
-                    # Vérifier si la facture existe déjà dans n'importe quelle balance
-                    existing = self.env['account.daily.balance.line'].search([
-                        ('reference', '=', inv.name),
-                        ('balance_id.company_id', '=', record.company_id.id),
-                    ], limit=1)
-
-                    if existing:
-                        if existing.balance_id.etat == 'ouvert':
-                            # Mise à jour si la facture est dans une balance ouverte
-                            existing.write({
-                                'balance_id': record.id,
-                                'categorie': "FACTURE CLIENT",
-                                'libelle': inv.journal_label,
-                                'payment': "cash",
-                                'debit': 0.0,
-                                'credit': inv.amount_total,
-                            })
-                            total_credit += inv.amount_total
-                        # Si la facture est dans une balance clôturée, on ne fait rien
-                        continue
-
-                    # Créer une nouvelle ligne si elle n'existe dans aucune balance
-                    self.env['account.daily.balance.line'].create({
-                        'balance_id': record.id,
-                        'reference': inv.name,
-                        'categorie': "FACTURE CLIENT",
-                        'libelle': inv.journal_label,
-                        'payment': "cash",
-                        'debit': 0.0,
-                        'credit': inv.amount_total,
-                    })
-                    total_credit += inv.amount_total
-
-            # total_credit contient maintenant la somme des factures clients cash ajoutées ou mises à jour
-
-            # Factures fournisseurs CASH uniquement (filtrées par company)
-            if record.etat == 'ouvert':
-
-                # Dernière balance clôturée
-                last_closed_balance = self.search([
-                    ('company_id', '=', record.company_id.id),
-                    ('etat', '=', 'cloturer')
-                ], order='date desc', limit=1)
-
-                start_date = last_closed_balance.date if last_closed_balance else record.date
-
-                # Récupérer toutes les factures fournisseurs payées en cash depuis la dernière balance clôturée
-                vendor_bills = self.env['account.move'].search([
-                    ('move_type', '=', 'in_invoice'),
-                    ('payment_state', '=', 'paid'),
-                    ('state', '=', 'posted'),
-                    ('invoice_date', '>=', start_date),
-                    ('company_id', '=', record.company_id.id),
-                ])
-
-                total_debit = 0
-                for bill in vendor_bills:
-                    payments = bill._get_reconciled_payments()
-                    payment = payments[0] if payments else False
-
-                    if not payment or payment.journal_id.type != "cash":
-                        continue
-
-                    # Vérifier si la facture existe déjà dans n'importe quelle balance
-                    existing = self.env['account.daily.balance.line'].search([
-                        ('reference', '=', bill.name),
-                        ('balance_id.company_id', '=', record.company_id.id),
-                    ], limit=1)
-
-                    if existing:
-                        if existing.balance_id.etat == 'ouvert':
-                            # Mise à jour si la facture se trouve dans une balance ouverte
-                            existing.write({
-                                'balance_id': record.id,
-                                'categorie': "FACTURE FOURNISSEUR",
-                                'libelle': bill.journal_label,
-                                'payment': "cash",
-                                'debit': bill.amount_total,
-                                'credit': 0.0,
-                            })
-                            total_debit += bill.amount_total
-                        # Si elle est dans une balance clôturée → ne rien faire
-                        continue
-
-                    # Créer une nouvelle ligne si elle n'existe nulle part
-                    self.env['account.daily.balance.line'].create({
-                        'balance_id': record.id,
-                        'reference': bill.name,
-                        'categorie': "FACTURE FOURNISSEUR",
-                        'libelle': bill.journal_label,
-                        'payment': "cash",
-                        'debit': bill.amount_total,
-                        'credit': 0.0,
-                    })
-                    total_debit += bill.amount_total
+                for move in invoices:
+                    payments = move._get_reconciled_payments().filtered(
+                        lambda p: p.journal_id.type == 'cash'
+                        and p.company_id == record.company_id
+                        and p.date == record.date
+                    )
+                    for payment in payments:
+                        self.env['account.daily.balance.line']._upsert_invoice_payment(
+                            record, move, payment
+                        )
 
             current_year = datetime.now().year
 
@@ -503,8 +475,72 @@ class AccountDailyBalanceLine(models.Model):
         readonly=True,
     )
     categorie = fields.Char(string="Catégorie")
+    payment_id = fields.Many2one('account.payment', string='Paiement comptable', readonly=True, index=True)
+    move_id = fields.Many2one('account.move', string='Facture', readonly=True, index=True)
+    journal_id = fields.Many2one('account.journal', string='Journal', readonly=True, index=True)
+    payment_date = fields.Date(string='Date du paiement', readonly=True, index=True)
+    payment_key = fields.Char(string='Clé anti-doublon', readonly=True, index=True)
     # company_id lié à la balance pour compatibilité multientreprise
     company_id = fields.Many2one('res.company', related='balance_id.company_id', store=True, readonly=True)
+
+    _sql_constraints = [
+        ('unique_payment', 'unique(payment_id)', 'Ce paiement existe déjà dans une balance caisse.'),
+        (
+            'unique_payment_key_company',
+            'unique(payment_key, company_id)',
+            'Cette opération existe déjà dans une balance caisse.',
+        ),
+    ]
+
+    @api.model
+    def _payment_key(self, move, payment):
+        return '%s:%s:%s:%s' % (
+            move.id,
+            payment.journal_id.id,
+            payment.amount,
+            payment.date,
+        )
+
+    @api.model
+    def _upsert_invoice_payment(self, balance, move, payment):
+        payment_key = False if payment.id else self._payment_key(move, payment)
+        existing = self.search([('payment_id', '=', payment.id)], limit=1)
+        if not existing and payment_key:
+            existing = self.search([
+                ('payment_key', '=', payment_key),
+                ('company_id', '=', balance.company_id.id),
+            ], limit=1)
+        if not existing:
+            legacy_lines = self.search([
+                ('balance_id', '=', balance.id),
+                ('reference', '=', move.name),
+                ('payment_id', '=', False),
+                ('move_id', '=', False),
+            ])
+            existing = legacy_lines[:1]
+            if len(legacy_lines) > 1:
+                legacy_lines[1:].unlink()
+
+        amount = abs(payment.amount_company_currency_signed or payment.amount)
+        vals = {
+            'balance_id': balance.id,
+            'reference': payment.name or move.name,
+            'categorie': 'FACTURE CLIENT' if move.move_type == 'out_invoice' else 'FACTURE FOURNISSEUR',
+            'libelle': getattr(move, 'journal_label', False) or move.name,
+            'payment': 'cash',
+            'debit': amount if move.move_type == 'in_invoice' else 0.0,
+            'credit': amount if move.move_type == 'out_invoice' else 0.0,
+            'payment_id': payment.id,
+            'move_id': move.id,
+            'journal_id': payment.journal_id.id,
+            'payment_date': payment.date,
+            'payment_key': payment_key,
+        }
+        if existing:
+            if existing.balance_id.etat == 'ouvert':
+                existing.write(vals)
+            return existing
+        return self.create(vals)
 
     @api.depends('balance_id.line_ids.origin_line_id', 'balance_id.line_ids.libelle')
     def _compute_regule_badge(self):
@@ -552,31 +588,38 @@ class AccountPaymentRegister(models.TransientModel):
     def action_create_payments(self):
         payments = super(AccountPaymentRegister, self).action_create_payments()
 
-        today = fields.Date.context_today(self)
+        payment_date = self.payment_date or fields.Date.context_today(self)
 
         # CASH
         if self.journal_id.type == "cash":
             balance = self.env['account.daily.balance'].search([
-                ('date', '=', today),
+                ('date', '=', payment_date),
                 ('company_id', '=', self.env.company.id),
             ], limit=1)
             if not balance:
                 balance = self.env['account.daily.balance'].create({
-                    'date': today,
+                    'date': payment_date,
                     'company_id': self.env.company.id
                 })
             balance.action_update_totals()
 
         # MOBILE MONEY
-        if self.journal_id.type == "bank" and self.journal_id.name.lower() == "mobile money":
+        operator = self.env['mobile.money.operator'].search([
+            ('journal_id', '=', self.journal_id.id),
+            ('company_id', '=', self.company_id.id),
+            ('active', '=', True),
+        ], limit=1)
+        if operator:
             balance_mobile = self.env['account.daily.balance.mobile'].search([
-                ('date', '=', today),
-                ('company_id', '=', self.env.company.id),
+                ('date', '=', payment_date),
+                ('company_id', '=', self.company_id.id),
+                ('operator_id', '=', operator.id),
             ], limit=1)
             if not balance_mobile:
                 balance_mobile = self.env['account.daily.balance.mobile'].create({
-                    'date': today,
-                    'company_id': self.env.company.id
+                    'date': payment_date,
+                    'company_id': self.company_id.id,
+                    'operator_id': operator.id,
                 })
             balance_mobile.action_update_totals_mobile()
 

@@ -2,6 +2,8 @@
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError
 from datetime import timedelta, datetime
+from collections import defaultdict
+from dateutil.relativedelta import relativedelta
 
 
 class AccountJournal(models.Model):
@@ -58,11 +60,28 @@ class AccountDailyBalanceMobile(models.Model):
         required=True,
         default=lambda self: self.env.company.id
     )
+    company_currency_id = fields.Many2one(
+        'res.currency',
+        string='Currency',
+        related='company_id.currency_id',
+        store=True,
+        readonly=True,
+    )
+    operator_id = fields.Many2one(
+        'mobile.money.operator',
+        string='Opérateur Mobile Money',
+        domain="[('company_id', '=', company_id)]",
+        check_company=True,
+    )
 
     line_ids = fields.One2many('account.daily.balance.mobile.line', 'balance_id', string='Détails')
 
     _sql_constraints = [
-        ('unique_date_mobile', 'unique(date, company_id)', 'Une seule ligne Mobile Money par jour et par entreprise.')
+        (
+            'unique_date_company_operator',
+            'unique(date, company_id, operator_id)',
+            'Une seule balance Mobile Money est autorisée par jour, société et opérateur.',
+        )
     ]
     etats = fields.Selection(
         [('ouvert', 'OUVERT ✏️'), ('cloturer', '🔒 CLOTURER')],
@@ -71,20 +90,107 @@ class AccountDailyBalanceMobile(models.Model):
         readonly=True
     )
 
+    def get_dashboard_chart_data(self, period='day'):
+        self.ensure_one()
+        if period not in ('day', 'month'):
+            raise UserError(_("La période du dashboard doit être 'day' ou 'month'."))
+
+        date_from = self.date
+        date_to = self.date
+        if period == 'month':
+            date_from = self.date.replace(day=1)
+            date_to = date_from + relativedelta(months=1, days=-1)
+
+        lines = self.env['account.daily.balance.mobile.line'].search([
+            ('company_id', '=', self.company_id.id),
+            ('balance_id.operator_id', '=', self.operator_id.id),
+            ('balance_id.date', '>=', date_from),
+            ('balance_id.date', '<=', date_to),
+        ])
+        expenses = defaultdict(float)
+        sales = defaultdict(float)
+
+        for line in lines:
+            label = line.libelle or line.reference or _("Sans libellé")
+            if line.debit > 0:
+                expenses[label] += line.debit
+            if line.credit > 0:
+                sales[label] += line.credit
+
+        def chart_values(values):
+            ordered = sorted(values.items(), key=lambda item: item[1], reverse=True)
+            return {
+                'labels': [label for label, amount in ordered],
+                'series': [amount for label, amount in ordered],
+            }
+
+        return {
+            'expenses': chart_values(expenses),
+            'sales': chart_values(sales),
+            'currency': {
+                'symbol': self.company_currency_id.symbol or self.company_currency_id.name,
+                'position': self.company_currency_id.position,
+            },
+        }
+
+    def action_open_dashboard_lines(self, period, section, label):
+        self.ensure_one()
+        if period not in ('day', 'month') or section not in ('expenses', 'sales'):
+            raise UserError(_("Filtre du dashboard invalide."))
+
+        date_from = self.date
+        date_to = self.date
+        if period == 'month':
+            date_from = self.date.replace(day=1)
+            date_to = date_from + relativedelta(months=1, days=-1)
+
+        lines = self.env['account.daily.balance.mobile.line'].search([
+            ('company_id', '=', self.company_id.id),
+            ('operator_id', '=', self.operator_id.id),
+            ('balance_id.date', '>=', date_from),
+            ('balance_id.date', '<=', date_to),
+            ('debit' if section == 'expenses' else 'credit', '>', 0),
+        ]).filtered(
+            lambda line: (line.libelle or line.reference or _("Sans libellé")) == label
+        )
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _("%(label)s - lignes d'origine", label=label),
+            'res_model': 'account.daily.balance.mobile.line',
+            'view_mode': 'tree,form',
+            'views': [
+                (self.env.ref('custom_paid_totals.view_account_daily_balance_mobile_line_dashboard_tree').id, 'tree'),
+                (False, 'form'),
+            ],
+            'domain': [('id', 'in', lines.ids)],
+            'context': {'create': False, 'edit': False, 'delete': False},
+        }
+
     def action_open_retrait_wizard(self):
+        self.ensure_one()
         return {
             "name": _("Veuillez entrer la description et la référence de la transaction et le montant"),
             "type": "ir.actions.act_window",
             "res_model": "retrait.wizard",
             "view_mode": "form",
             "target": "new",
+            "context": {"default_balance_id": self.id},
         }
 
     @api.model
     def default_get(self, fields_list):
+        defaults = super().default_get(fields_list)
+        operator_id = defaults.get('operator_id') or self.env.context.get('default_operator_id')
+        if not operator_id:
+            return defaults
+
         today = fields.Date.context_today(self)
         last_balance = self.search(
-            [('company_id', '=', self.env.company.id)],
+            [
+                ('company_id', '=', self.env.company.id),
+                ('operator_id', '=', operator_id),
+                ('date', '<=', today),
+            ],
             order="date desc",
             limit=1
         )
@@ -107,18 +213,28 @@ class AccountDailyBalanceMobile(models.Model):
                     "Veuillez d'abord clôturer le journal précédent."
                 ))
 
-        return super(AccountDailyBalanceMobile, self).default_get(fields_list)
+        return defaults
 
     @api.model
     def create(self, vals):
         """Créer ou réutiliser la balance Mobile Money du jour."""
         today = fields.Date.context_today(self)
         company_id = vals.get('company_id') or self.env.company.id
+        operator_id = vals.get('operator_id')
+        if not operator_id:
+            raise UserError(_("Veuillez sélectionner un opérateur Mobile Money."))
 
-        # 1) Vérifier si une balance du jour existe déjà
+        date_record = vals.get('date') or today
+        if isinstance(date_record, str):
+            date_record = fields.Date.from_string(date_record)
+        vals.setdefault('date', date_record)
+        vals['etats'] = 'ouvert'
+
+        # 1) Vérifier si une balance de la date existe déjà
         today_balance = self.search([
             ('company_id', '=', company_id),
-            ('date', '=', today)
+            ('date', '=', date_record),
+            ('operator_id', '=', operator_id),
         ], limit=1)
 
         if today_balance:
@@ -128,17 +244,10 @@ class AccountDailyBalanceMobile(models.Model):
 
         # 2) Récupérer la dernière balance
         last_balance = self.search([
-            ('company_id', '=', company_id)
+            ('company_id', '=', company_id),
+            ('operator_id', '=', operator_id),
+            ('date', '<=', date_record),
         ], order="date desc", limit=1)
-
-        # 3) Déterminer la date fournie ou utiliser aujourd'hui
-        date_record = vals.get('date')
-        if date_record:
-            if isinstance(date_record, str):
-                date_record = fields.Date.from_string(date_record)
-        else:
-            date_record = today
-            vals['date'] = today
 
         # 4) Cas où aucune balance précédente n'existe ou la dernière est déjà clôturée
         if not last_balance or last_balance.etats == 'cloturer':
@@ -173,128 +282,27 @@ class AccountDailyBalanceMobile(models.Model):
             # Ancien solde depuis la dernière balance clôturée
             last_closed_balance = self.search([
                 ('company_id', '=', record.company_id.id),
-                ('etats', '=', 'cloturer')
+                ('operator_id', '=', record.operator_id.id),
+                ('etats', '=', 'cloturer'),
+                ('date', '<', record.date),
             ], order='date desc', limit=1)
             record.ancien_solde = last_closed_balance.nouveau_solde if last_closed_balance else 0.0
 
-            start_date = last_closed_balance.date + timedelta(days=1) if last_closed_balance else record.date
-
-            # Précharger toutes les lignes de la balance en cours
-            existing_lines = self.env['account.daily.balance.mobile.line'].search([
-                ('balance_id', '=', record.id)
-            ])
-            existing_refs = {line.reference: line for line in existing_lines}
-
-            # Précharger toutes les références des lignes dans les balances clôturées pour les ignorer
-            closed_lines = self.env['account.daily.balance.mobile.line'].search([
-                ('balance_id.etats', '=', 'cloturer'),
-                ('company_id', '=', record.company_id.id)
-            ])
-            closed_refs = set(closed_lines.mapped('reference'))
-
-            batch_vals = []
-
-            # ───────────────
-            # Factures clients Mobile Money
-            # ───────────────
-            client_invoices = self.env['account.move'].search([
-                ('move_type', '=', 'out_invoice'),
-                ('payment_state', '=', 'paid'),
+            invoices = self.env['account.move'].search([
+                ('move_type', 'in', ('out_invoice', 'in_invoice')),
                 ('state', '=', 'posted'),
-                ('invoice_date', '>=', start_date),
                 ('company_id', '=', record.company_id.id),
             ])
-
-            for inv in client_invoices:
-                payments = inv._get_reconciled_payments()
-                payment = payments[0] if payments else False
-                if not payment or not (
-                        payment.journal_id.type == "bank" and
-                        payment.journal_id.name and
-                        payment.journal_id.name.strip().lower() == "mobile money"
-                ):
-                    continue
-
-                # Ignorer si déjà dans une balance clôturée
-                if inv.name in closed_refs:
-                    continue
-
-                # Mettre à jour si déjà dans la balance en cours
-                if inv.name in existing_refs:
-                    existing_line = existing_refs[inv.name]
-                    existing_line.write({
-                        'categorie': "FACTURE CLIENT",
-                        'libelle': getattr(inv, 'journal_label', inv.name),
-                        'payment': "mobile",
-                        'debit': 0.0,
-                        'credit': inv.amount_total,
-                    })
-                    continue
-
-                # Nouvelle ligne à créer
-                batch_vals.append({
-                    'balance_id': record.id,
-                    'categorie': "FACTURE CLIENT",
-                    'reference': inv.name,
-                    'libelle': getattr(inv, 'journal_label', inv.name),
-                    'payment': "mobile",
-                    'debit': 0.0,
-                    'credit': inv.amount_total,
-                    'company_id': record.company_id.id,
-                })
-
-            # ───────────────
-            # Factures fournisseurs Mobile Money
-            # ───────────────
-            vendor_bills = self.env['account.move'].search([
-                ('move_type', '=', 'in_invoice'),
-                ('payment_state', '=', 'paid'),
-                ('state', '=', 'posted'),
-                ('invoice_date', '>=', start_date),
-                ('company_id', '=', record.company_id.id),
-            ])
-
-            for bill in vendor_bills:
-                payments = bill._get_reconciled_payments()
-                payment = payments[0] if payments else False
-                if not payment or not (
-                        payment.journal_id.type == "bank" and
-                        payment.journal_id.name and
-                        payment.journal_id.name.strip().lower() == "mobile money"
-                ):
-                    continue
-
-                # Ignorer si déjà dans une balance clôturée
-                if bill.name in closed_refs:
-                    continue
-
-                # Mettre à jour si déjà dans la balance en cours
-                if bill.name in existing_refs:
-                    existing_line = existing_refs[bill.name]
-                    existing_line.write({
-                        'categorie': "FACTURE FOURNISSEUR",
-                        'libelle': getattr(bill, 'journal_label', bill.name),
-                        'payment': "mobile",
-                        'debit': bill.amount_total,
-                        'credit': 0.0,
-                    })
-                    continue
-
-                # Nouvelle ligne à créer
-                batch_vals.append({
-                    'balance_id': record.id,
-                    'categorie': "FACTURE FOURNISSEUR",
-                    'reference': bill.name,
-                    'libelle': getattr(bill, 'journal_label', bill.name),
-                    'payment': "mobile",
-                    'debit': bill.amount_total,
-                    'credit': 0.0,
-                    'company_id': record.company_id.id,
-                })
-
-            # Créer toutes les nouvelles lignes en batch
-            if batch_vals:
-                self.env['account.daily.balance.mobile.line'].create(batch_vals)
+            for move in invoices:
+                payments = move._get_reconciled_payments().filtered(
+                    lambda p: p.journal_id == record.operator_id.journal_id
+                    and p.company_id == record.company_id
+                    and p.date == record.date
+                )
+                for payment in payments:
+                    self.env['account.daily.balance.mobile.line']._upsert_invoice_payment(
+                        record, move, payment
+                    )
 
             # ───────────────
             # Recalcul des totaux
@@ -394,6 +402,13 @@ class AccountDailyBalanceMobileLine(models.Model):
     _rec_name = 'reference'
 
     balance_id = fields.Many2one('account.daily.balance.mobile', string='Balance', ondelete='cascade')
+    operator_id = fields.Many2one(
+        'mobile.money.operator',
+        string='Opérateur Mobile Money',
+        related='balance_id.operator_id',
+        store=True,
+        readonly=True,
+    )
     reference = fields.Char(string='REFERENCE FACTURE')
     libelle = fields.Char(string='LIBELLE')
     payment = fields.Char(string='PAYMENT')
@@ -402,12 +417,77 @@ class AccountDailyBalanceMobileLine(models.Model):
     regule_badge = fields.Char(string="Badge", compute="_compute_regule_badge", store=True)
     origin_line_id = fields.Many2one('account.daily.balance.mobile.line', string="Ligne d'origine", readonly=True)
     categorie = fields.Char(string="Catégorie")
+    payment_id = fields.Many2one('account.payment', string='Paiement comptable', readonly=True, index=True)
+    move_id = fields.Many2one('account.move', string='Facture', readonly=True, index=True)
+    journal_id = fields.Many2one('account.journal', string='Journal', readonly=True, index=True)
+    payment_date = fields.Date(string='Date du paiement', readonly=True, index=True)
+    payment_key = fields.Char(string='Clé anti-doublon', readonly=True, index=True)
     company_id = fields.Many2one(
         'res.company',
         string='Company',
         default=lambda self: self.env.company.id,
         required=True
     )
+
+    _sql_constraints = [
+        ('unique_payment', 'unique(payment_id)', 'Ce paiement existe déjà dans une balance Mobile Money.'),
+        (
+            'unique_payment_key_company',
+            'unique(payment_key, company_id)',
+            'Cette opération existe déjà dans une balance Mobile Money.',
+        ),
+    ]
+
+    @api.model
+    def _payment_key(self, move, payment):
+        return '%s:%s:%s:%s' % (
+            move.id,
+            payment.journal_id.id,
+            payment.amount,
+            payment.date,
+        )
+
+    @api.model
+    def _upsert_invoice_payment(self, balance, move, payment):
+        payment_key = False if payment.id else self._payment_key(move, payment)
+        existing = self.search([('payment_id', '=', payment.id)], limit=1)
+        if not existing and payment_key:
+            existing = self.search([
+                ('payment_key', '=', payment_key),
+                ('company_id', '=', balance.company_id.id),
+            ], limit=1)
+        if not existing:
+            legacy_lines = self.search([
+                ('balance_id', '=', balance.id),
+                ('reference', '=', move.name),
+                ('payment_id', '=', False),
+                ('move_id', '=', False),
+            ])
+            existing = legacy_lines[:1]
+            if len(legacy_lines) > 1:
+                legacy_lines[1:].unlink()
+
+        amount = abs(payment.amount_company_currency_signed or payment.amount)
+        vals = {
+            'balance_id': balance.id,
+            'reference': payment.name or move.name,
+            'categorie': 'FACTURE CLIENT' if move.move_type == 'out_invoice' else 'FACTURE FOURNISSEUR',
+            'libelle': getattr(move, 'journal_label', False) or move.name,
+            'payment': 'mobile',
+            'debit': amount if move.move_type == 'in_invoice' else 0.0,
+            'credit': amount if move.move_type == 'out_invoice' else 0.0,
+            'payment_id': payment.id,
+            'move_id': move.id,
+            'journal_id': payment.journal_id.id,
+            'payment_date': payment.date,
+            'payment_key': payment_key,
+            'company_id': balance.company_id.id,
+        }
+        if existing:
+            if existing.balance_id.etats == 'ouvert':
+                existing.write(vals)
+            return existing
+        return self.create(vals)
 
     @api.depends('balance_id.line_ids.origin_line_id', 'balance_id.line_ids.libelle')
     def _compute_regule_badge(self):
@@ -558,6 +638,12 @@ class RetraitWizard(models.TransientModel):
         required=True,
         default=lambda self: self.env.company
     )
+    balance_id = fields.Many2one(
+        'account.daily.balance.mobile',
+        string='Balance Mobile Money',
+        required=True,
+        domain="[('company_id', '=', company_id), ('etats', '=', 'ouvert')]",
+    )
 
     def _generate_reference(self):
         current_year = datetime.now().year
@@ -584,29 +670,7 @@ class RetraitWizard(models.TransientModel):
         return res
 
     def action_confirm_retrait(self):
-        today = fields.Date.today()
-
-        # On récupère la dernière balance, ouverte ou clôturée
-        last_balance = self.env["account.daily.balance.mobile"].search(
-            [('company_id', '=', self.env.company.id)],
-            order='date desc',
-            limit=1
-        )
-
-        if not last_balance:
-            raise UserError(_("Aucune balance Mobile Money n'existe. Veuillez en créer une."))
-
-        # 🔵 SI la dernière balance est OUVERTE → on travaille dessus
-        if last_balance.etats == 'ouvert':
-            balance_obj = last_balance
-
-        else:
-            # 🔵 SI elle est CLOTURÉE → on crée une nouvelle balance pour aujourd’hui
-            balance_obj = self.env["account.daily.balance.mobile"].create({
-                'date': today,
-                'company_id': self.env.company.id,
-                'ancien_solde': last_balance.nouveau_solde,
-            })
+        balance_obj = self.balance_id
 
         # Vérification du solde
         if self.montant > balance_obj.nouveau_solde:
