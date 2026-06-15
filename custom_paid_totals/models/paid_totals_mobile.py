@@ -45,12 +45,12 @@ class AccountJournal(models.Model):
 # -------------------------
 class AccountDailyBalanceMobile(models.Model):
     _name = 'account.daily.balance.mobile'
-    _description = 'Rapport journalier Débit/Crédit Mobile Money'
+    _description = 'Rapport journalier Encaissements/Décaissements par journal'
     _rec_name = 'date'
 
     date = fields.Date(string='Date', required=True, default=fields.Date.context_today, readonly=True)
-    total_debit = fields.Float(string='Total Débit', readonly=True)
-    total_credit = fields.Float(string='Total Crédit', readonly=True)
+    total_debit = fields.Float(string='Total Décaissements', readonly=True)
+    total_credit = fields.Float(string='Total Encaissements', readonly=True)
     ancien_solde = fields.Float(string='Ancien solde', readonly=True)
     nouveau_solde = fields.Float(string='Nouveau solde', readonly=True)
     show_lines = fields.Boolean(string='Afficher les lignes', default=False)
@@ -69,7 +69,7 @@ class AccountDailyBalanceMobile(models.Model):
     )
     operator_id = fields.Many2one(
         'mobile.money.operator',
-        string='Opérateur Mobile Money',
+        string='Journal de trésorerie',
         domain="[('company_id', '=', company_id)]",
         check_company=True,
     )
@@ -80,7 +80,7 @@ class AccountDailyBalanceMobile(models.Model):
         (
             'unique_date_company_operator',
             'unique(date, company_id, operator_id)',
-            'Une seule balance Mobile Money est autorisée par jour, société et opérateur.',
+            'Une seule balance est autorisée par jour, société et journal.',
         )
     ]
     etats = fields.Selection(
@@ -256,19 +256,16 @@ class AccountDailyBalanceMobile(models.Model):
             vals['company_id'] = company_id
             return super().create(vals)
 
-        # 5) Si la dernière balance est ouverte mais date < date du jour → on ne crée pas
+        # Si la dernière balance est ouverte, continuer à l'utiliser.
         if last_balance.date < date_record and last_balance.etats == 'ouvert':
-            # On utilise la balance ouverte existante
             last_balance.action_update_totals_mobile()
             return last_balance
 
-        # 6) Si la dernière balance est d'hier et clôturée → nouvelle balance avec nouvel ancien_solde
         if last_balance.date == date_record - timedelta(days=1):
             vals['ancien_solde'] = last_balance.nouveau_solde
             vals['company_id'] = company_id
             return super().create(vals)
 
-        # 7) Cas général (nouvelle date sans dépendance)
         vals['ancien_solde'] = last_balance.nouveau_solde
         vals['company_id'] = company_id
         return super().create(vals)
@@ -288,18 +285,19 @@ class AccountDailyBalanceMobile(models.Model):
             ], order='date desc', limit=1)
             record.ancien_solde = last_closed_balance.nouveau_solde if last_closed_balance else 0.0
 
-            invoices = self.env['account.move'].search([
-                ('move_type', 'in', ('out_invoice', 'in_invoice')),
+            payments = self.env['account.payment'].search([
                 ('state', '=', 'posted'),
                 ('company_id', '=', record.company_id.id),
+                ('journal_id', '=', record.operator_id.journal_id.id),
+                ('date', '>=', record.date),
             ])
-            for move in invoices:
-                payments = move._get_reconciled_payments().filtered(
-                    lambda p: p.journal_id == record.operator_id.journal_id
-                    and p.company_id == record.company_id
-                    and p.date == record.date
-                )
-                for payment in payments:
+            for payment in payments:
+                expense = payment.move_id.line_ids.expense_id[:1]
+                if expense:
+                    self.env['account.daily.balance.mobile.line']._upsert_hr_expense_payment(
+                        record, expense, payment
+                    )
+                for move in payment.reconciled_invoice_ids | payment.reconciled_bill_ids:
                     self.env['account.daily.balance.mobile.line']._upsert_invoice_payment(
                         record, move, payment
                     )
@@ -397,14 +395,14 @@ class UpdateTotalsMobileWizard(models.TransientModel):
 # -------------------------
 class AccountDailyBalanceMobileLine(models.Model):
     _name = 'account.daily.balance.mobile.line'
-    _description = 'Ligne du journal Mobile Money'
+    _description = 'Ligne du journal de trésorerie'
     _order = 'id asc'
     _rec_name = 'reference'
 
     balance_id = fields.Many2one('account.daily.balance.mobile', string='Balance', ondelete='cascade')
     operator_id = fields.Many2one(
         'mobile.money.operator',
-        string='Opérateur Mobile Money',
+        string='Journal de trésorerie',
         related='balance_id.operator_id',
         store=True,
         readonly=True,
@@ -412,10 +410,11 @@ class AccountDailyBalanceMobileLine(models.Model):
     reference = fields.Char(string='REFERENCE FACTURE')
     libelle = fields.Char(string='LIBELLE')
     payment = fields.Char(string='PAYMENT')
-    debit = fields.Float(string='DEBIT')
-    credit = fields.Float(string='CREDIT')
+    debit = fields.Float(string='DÉCAISSEMENT')
+    credit = fields.Float(string='ENCAISSEMENT')
     regule_badge = fields.Char(string="Badge", compute="_compute_regule_badge", store=True)
     origin_line_id = fields.Many2one('account.daily.balance.mobile.line', string="Ligne d'origine", readonly=True)
+    expense_id = fields.Many2one('hr.expense', string='Dépense RH', readonly=True)
     categorie = fields.Char(string="Catégorie")
     payment_id = fields.Many2one('account.payment', string='Paiement comptable', readonly=True, index=True)
     move_id = fields.Many2one('account.move', string='Facture', readonly=True, index=True)
@@ -482,6 +481,37 @@ class AccountDailyBalanceMobileLine(models.Model):
             'payment_date': payment.date,
             'payment_key': payment_key,
             'company_id': balance.company_id.id,
+        }
+        if existing:
+            if existing.balance_id.etats == 'ouvert':
+                existing.write(vals)
+            return existing
+        return self.create(vals)
+
+    @api.model
+    def _upsert_hr_expense_payment(self, balance, expense, payment):
+        existing = self.search([('payment_id', '=', payment.id)], limit=1)
+        if not existing:
+            existing = self.search([
+                ('expense_id', '=', expense.id),
+                ('company_id', '=', balance.company_id.id),
+            ], limit=1)
+
+        amount = abs(payment.amount_company_currency_signed or payment.amount)
+        vals = {
+            'balance_id': balance.id,
+            'expense_id': expense.id,
+            'reference': payment.name,
+            'categorie': expense.product_id.name or 'DÉPENSE RH',
+            'libelle': expense.name,
+            'payment': 'mobile',
+            'debit': amount,
+            'credit': 0.0,
+            'payment_id': payment.id,
+            'move_id': payment.move_id.id,
+            'journal_id': payment.journal_id.id,
+            'payment_date': payment.date,
+            'payment_key': False,
         }
         if existing:
             if existing.balance_id.etats == 'ouvert':

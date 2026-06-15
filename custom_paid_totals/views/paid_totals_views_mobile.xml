@@ -5,7 +5,7 @@
         <field name="name">account.daily.balance.mobile.tree</field>
         <field name="model">account.daily.balance.mobile</field>
         <field name="arch" type="xml">
-            <tree string="Multi Mobile Money">
+            <tree string="Journaux de trésorerie">
                 <field name="date"/>
                 <field name="operator_id"/>
                 <field name="company_id"/>
@@ -30,7 +30,7 @@
         <field name="name">account.daily.balance.mobile.form</field>
         <field name="model">account.daily.balance.mobile</field>
         <field name="arch" type="xml">
-            <form string="Multi Mobile Money">
+            <form string="Journal de trésorerie">
                 <header>
 
                     <button name="action_update_totals_wizard_mobile" type="object" string="DEPOT"
@@ -81,13 +81,13 @@
                                    options="{'currency_field': 'company_currency_id'}"/>
                         </div>
                         <div class="daily-balance-summary-item">
-                            <strong>Total Dépense :</strong>
+                            <strong>Total Décaissements :</strong>
                             <field name="total_debit" nolabel="1" readonly="1"
                                    widget="monetary"
                                    options="{'currency_field': 'company_currency_id'}"/>
                         </div>
                         <div class="daily-balance-summary-item">
-                            <strong>Total Vente :</strong>
+                            <strong>Total Encaissements :</strong>
                             <field name="total_credit" nolabel="1" readonly="1"
                                    widget="monetary"
                                    options="{'currency_field': 'company_currency_id'}"/>
@@ -220,7 +220,7 @@
         </field>
     </record>
     <record id="action_paid_daily_total_mobile" model="ir.actions.act_window">
-        <field name="name">Multi Mobile Money</field>
+        <field name="name">Tous les journaux</field>
         <field name="res_model">account.daily.balance.mobile</field>
         <field name="view_mode">tree,form</field>
         <field name="domain">[('company_id','in',context.get('allowed_company_ids', []))]</field>
@@ -237,6 +237,7 @@
                 <field name="libelle"/>
                 <field name="move_id" string="Facture d'origine"/>
                 <field name="payment_id" string="Paiement d'origine"/>
+                <field name="expense_id" string="Dépense d'origine"/>
                 <field name="journal_id"/>
                 <field name="payment_date"/>
                 <field name="debit"/>
@@ -249,13 +250,13 @@
         <field name="name">account.daily.balance.mobile.search</field>
         <field name="model">account.daily.balance.mobile</field>
         <field name="arch" type="xml">
-            <search string="Multi Mobile Money">
+            <search string="Journaux de trésorerie">
                 <field name="date"/>
                 <field name="operator_id"/>
                 <field name="company_id"/>
                 <filter string="Ouvertes" name="open" domain="[('etats', '=', 'ouvert')]"/>
                 <group expand="0" string="Regrouper par">
-                    <filter string="Opérateur" name="group_by_operator"
+                    <filter string="Journal" name="group_by_operator"
                             context="{'group_by': 'operator_id'}"/>
                     <filter string="Société" name="group_by_company"
                             context="{'group_by': 'company_id'}"/>
@@ -270,7 +271,7 @@
         <field name="name">mobile.money.operator.tree</field>
         <field name="model">mobile.money.operator</field>
         <field name="arch" type="xml">
-            <tree string="Opérateurs Mobile Money">
+            <tree string="Journaux">
                 <field name="name"/>
                 <field name="code"/>
                 <field name="journal_id"/>
@@ -284,7 +285,7 @@
         <field name="name">mobile.money.operator.form</field>
         <field name="model">mobile.money.operator</field>
         <field name="arch" type="xml">
-            <form string="Opérateur Mobile Money">
+            <form string="Journal de trésorerie">
                 <sheet>
                     <group>
                         <field name="name"/>
@@ -303,7 +304,7 @@
         <field name="name">mobile.money.operator.search</field>
         <field name="model">mobile.money.operator</field>
         <field name="arch" type="xml">
-            <search string="Opérateurs Mobile Money">
+            <search string="Journaux">
                 <field name="name"/>
                 <field name="code"/>
                 <field name="journal_id"/>
@@ -314,17 +315,18 @@
     </record>
 
     <record id="action_mobile_money_operator" model="ir.actions.act_window">
-        <field name="name">Opérateurs Mobile Money</field>
+        <field name="name">Journaux</field>
         <field name="res_model">mobile.money.operator</field>
         <field name="view_mode">tree,form</field>
         <field name="domain">[('company_id','in',context.get('allowed_company_ids', []))]</field>
     </record>
-    <!-- JOURNAL MOBILE MONEY -->
-    <menuitem id="menu_mobile_journal"
-              name="Multi Mobile Money"
-              parent="menu_paid_totals_list"
-              action="action_paid_daily_total_mobile"
-              sequence="2"/>
+    <record id="menu_mobile_journal" model="ir.ui.menu">
+        <field name="name">Tous les journaux</field>
+        <field name="parent_id" ref="menu_paid_totals_list"/>
+        <field name="action" ref="action_paid_daily_total_mobile"/>
+        <field name="sequence">2</field>
+        <field name="active" eval="False"/>
+    </record>
 
     <menuitem id="menu_paid_totals_configuration"
               name="Configuration"
@@ -332,9 +334,11 @@
               sequence="90"/>
 
     <menuitem id="menu_mobile_money_operator"
-              name="Opérateurs Mobile Money"
+              name="Journaux"
               parent="menu_paid_totals_configuration"
               action="action_mobile_money_operator"
               sequence="10"/>
+
+    <function model="mobile.money.operator" name="_sync_all_treasury_menus"/>
 
 </odoo>

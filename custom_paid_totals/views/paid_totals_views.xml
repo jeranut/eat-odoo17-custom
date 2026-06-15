@@ -79,13 +79,13 @@
                                    options="{'currency_field': 'company_currency_id'}"/>
                         </div>
                         <div class="daily-balance-summary-item">
-                            <strong>Total Dépense :</strong>
+                            <strong>Total Décaissements :</strong>
                             <field name="total_debit" nolabel="1" readonly="1"
                                    widget="monetary"
                                    options="{'currency_field': 'company_currency_id'}"/>
                         </div>
                         <div class="daily-balance-summary-item">
-                            <strong>Total Vente :</strong>
+                            <strong>Total Encaissements :</strong>
                             <field name="total_credit" nolabel="1" readonly="1"
                                    widget="monetary"
                                    options="{'currency_field': 'company_currency_id'}"/>

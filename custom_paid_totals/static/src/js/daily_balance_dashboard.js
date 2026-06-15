@@ -59,7 +59,7 @@ export class DailyBalanceDashboard extends Component {
     }
 
     get title() {
-        const section = this.state.activeTab === "expenses" ? "Dépenses" : "Ventes";
+        const section = this.state.activeTab === "expenses" ? "Décaissements" : "Encaissements";
         const period = this.state.period === "day" ? "du jour" : "du mois";
         return `${section} ${period}`;
     }
@@ -145,7 +145,7 @@ export class DailyBalanceDashboard extends Component {
                 },
             },
             series: [{
-                name: this.state.activeTab === "expenses" ? "Débit" : "Crédit",
+                name: this.state.activeTab === "expenses" ? "Décaissements" : "Encaissements",
                 data: this.activeData.series,
             }],
             xaxis: {

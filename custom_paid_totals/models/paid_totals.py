@@ -8,7 +8,7 @@ from dateutil.relativedelta import relativedelta
 
 class AccountDailyBalance(models.Model):
     _name = 'account.daily.balance'
-    _description = 'Rapport journalier Débit/Crédit'
+    _description = 'Rapport journalier Encaissements/Décaissements'
     _rec_name = 'date'
     _check_company_auto = True
 
@@ -19,8 +19,8 @@ class AccountDailyBalance(models.Model):
         required=True,
         default=lambda self: self.env.company,
     )
-    total_debit = fields.Float(string='Total Débit', readonly=True)
-    total_credit = fields.Float(string='Total Crédit', readonly=True)
+    total_debit = fields.Float(string='Total Décaissements', readonly=True)
+    total_credit = fields.Float(string='Total Encaissements', readonly=True)
     ancien_solde = fields.Float(string='Ancien solde', readonly=True)
     nouveau_solde = fields.Float(string='Nouveau solde', readonly=True)
     show_lines = fields.Boolean(string='Afficher les lignes', default=False)
@@ -220,29 +220,24 @@ class AccountDailyBalance(models.Model):
         today = fields.Date.context_today(self)
         company_id = vals.get('company_id') or self.env.company.id
 
-        # Vérifier si la balance d'aujourd'hui existe déjà
         today_balance = self.search([
             ('company_id', '=', company_id),
             ('date', '=', today)
         ], limit=1)
 
         if today_balance:
-            # Retourner la balance existante pour ajouter les factures
             today_balance.action_update_totals()
             return today_balance
 
-        # Récupérer la dernière balance pour cette société
         last_balance = self.search([
             ('company_id', '=', company_id)
         ], order='date desc', limit=1)
 
         if not last_balance or last_balance.etat == 'cloturer':
-            # Créer une nouvelle balance
             vals['ancien_solde'] = last_balance.nouveau_solde if last_balance else 0.0
             vals['company_id'] = company_id
             return super().create(vals)
 
-        # Si la dernière balance est ouverte → utiliser la balance existante
         last_balance.action_update_totals()
         return last_balance
 
@@ -275,104 +270,23 @@ class AccountDailyBalance(models.Model):
             total_credit = 0
             total_debit = 0
 
-            # ───────────────
-            # Factures clients CASH
-            # ───────────────
-            last_balance = self.search(
-                [('company_id', '=', record.company_id.id)],
-                order='date desc',
-                limit=1
-            )
-
-            # Ajouter uniquement les paiements CASH de la date de la balance.
             if record.etat == 'ouvert':
-                invoices = self.env['account.move'].search([
-                    ('move_type', 'in', ('out_invoice', 'in_invoice')),
+                payments = self.env['account.payment'].search([
                     ('state', '=', 'posted'),
                     ('company_id', '=', record.company_id.id),
+                    ('journal_id.type', '=', 'cash'),
+                    ('date', '>=', record.date),
                 ])
-                for move in invoices:
-                    payments = move._get_reconciled_payments().filtered(
-                        lambda p: p.journal_id.type == 'cash'
-                        and p.company_id == record.company_id
-                        and p.date == record.date
-                    )
-                    for payment in payments:
+                for payment in payments:
+                    expense = payment.move_id.line_ids.expense_id[:1]
+                    if expense:
+                        self.env['account.daily.balance.line']._upsert_hr_expense_payment(
+                            record, expense, payment
+                        )
+                    for move in payment.reconciled_invoice_ids | payment.reconciled_bill_ids:
                         self.env['account.daily.balance.line']._upsert_invoice_payment(
                             record, move, payment
                         )
-
-            current_year = datetime.now().year
-
-            # Dépenses RH (filtrées par company)
-            # ───────────────
-            # Dépenses RH
-            # Dépenses RH
-            if record.etat == 'ouvert':
-                # Dernière balance clôturée
-                last_closed_balance = self.search([
-                    ('company_id', '=', record.company_id.id),
-                    ('etat', '=', 'cloturer')
-                ], order='date desc', limit=1)
-
-                start_date = last_closed_balance.date if last_closed_balance else fields.Date.context_today(self)
-
-                # Récupérer toutes les dépenses RH validées depuis la dernière balance clôturée
-                hr_expenses = self.env['hr.expense'].search([
-                    ('state', '=', 'done'),
-                    ('company_id', '=', record.company_id.id),
-                    ('date', '>=', start_date),
-                ])
-
-                total_debit_expenses = 0
-                current_year = datetime.now().year
-                last_line = self.env['account.daily.balance.line'].search([
-                    ('reference', 'like', f"DEP/{current_year}/%"),
-                    ('balance_id.company_id', '=', record.company_id.id)
-                ], order="reference desc", limit=1)
-                last_number = int(last_line.reference.split('/')[-1]) if last_line else 0
-
-                for exp in hr_expenses:
-                    # Vérifier si déjà dans une balance
-                    existing = self.env['account.daily.balance.line'].search([
-                        ('expense_id', '=', exp.id),
-                        ('balance_id.company_id', '=', record.company_id.id),
-                    ], limit=1)
-
-                    if existing:
-                        # Si déjà dans une balance ouverte → mise à jour
-                        if existing.balance_id.etat == 'ouvert':
-                            existing.write({
-                                'balance_id': record.id,
-                                'categorie': exp.product_id.name or "",
-                                'libelle': f"Dépense - {exp.name}",
-                                'payment': 'cash',
-                                'debit': exp.total_amount,
-                                'credit': 0.0,
-                            })
-                            total_debit_expenses += exp.total_amount
-                        # Si dans une balance clôturée → ignorer
-                        continue
-
-                    # Sinon créer une nouvelle ligne
-                    last_number += 1
-                    new_ref = f"DEP/{current_year}/{last_number:05d}"
-                    self.env['account.daily.balance.line'].create({
-                        'balance_id': record.id,
-                        'expense_id': exp.id,
-                        'reference': new_ref,
-                        'categorie': exp.product_id.name or "",
-                        'libelle': f"Dépense - {exp.name}",
-                        'payment': 'cash',
-                        'debit': exp.total_amount,
-                        'credit': 0.0,
-                    })
-                    total_debit_expenses += exp.total_amount
-
-                record.total_debit += total_debit_expenses
-
-                # Mettre à jour total_debit dans la balance
-                record.total_debit += total_debit
 
             # recalcul des totaux (plus fiable : lire lignes de la balance courante)
             total_credit = sum(record.line_ids.mapped('credit'))
@@ -453,7 +367,7 @@ class UpdateTotalsWizard(models.TransientModel):
 
 class AccountDailyBalanceLine(models.Model):
     _name = 'account.daily.balance.line'
-    _description = 'Ligne du rapport journalier Débit/Crédit'
+    _description = 'Ligne du rapport journalier Encaissements/Décaissements'
     _order = 'id asc'
     _rec_name = 'reference'
 
@@ -461,8 +375,8 @@ class AccountDailyBalanceLine(models.Model):
     reference = fields.Char(string='REFERENCE FACTURE')
     libelle = fields.Char(string='LIBELLE')
     payment = fields.Char(string='PAYMENT')
-    debit = fields.Float(string='DEBIT')
-    credit = fields.Float(string='CREDIT')
+    debit = fields.Float(string='DÉCAISSEMENT')
+    credit = fields.Float(string='ENCAISSEMENT')
     regule_badge = fields.Char(string="Badge", compute="_compute_regule_badge", store=True)
     origin_line_id = fields.Many2one(
         'account.daily.balance.line',
@@ -535,6 +449,37 @@ class AccountDailyBalanceLine(models.Model):
             'journal_id': payment.journal_id.id,
             'payment_date': payment.date,
             'payment_key': payment_key,
+        }
+        if existing:
+            if existing.balance_id.etat == 'ouvert':
+                existing.write(vals)
+            return existing
+        return self.create(vals)
+
+    @api.model
+    def _upsert_hr_expense_payment(self, balance, expense, payment):
+        existing = self.search([('payment_id', '=', payment.id)], limit=1)
+        if not existing:
+            existing = self.search([
+                ('expense_id', '=', expense.id),
+                ('company_id', '=', balance.company_id.id),
+            ], limit=1)
+
+        amount = abs(payment.amount_company_currency_signed or payment.amount)
+        vals = {
+            'balance_id': balance.id,
+            'expense_id': expense.id,
+            'reference': payment.name,
+            'categorie': expense.product_id.name or 'DÉPENSE RH',
+            'libelle': expense.name,
+            'payment': 'cash',
+            'debit': amount,
+            'credit': 0.0,
+            'payment_id': payment.id,
+            'move_id': payment.move_id.id,
+            'journal_id': payment.journal_id.id,
+            'payment_date': payment.date,
+            'payment_key': False,
         }
         if existing:
             if existing.balance_id.etat == 'ouvert':
@@ -633,37 +578,48 @@ class HrExpenseSheet(models.Model):
         res = super(HrExpenseSheet, self).action_sheet_move_create()
 
         for sheet in self:
-            company_id = sheet.company_id.id or self.env.company.id
-            today = fields.Date.context_today(self)
+            for payment in sheet.account_move_ids.payment_ids.filtered(
+                lambda p: p.state == 'posted'
+            ):
+                expense = payment.move_id.line_ids.expense_id[:1]
+                if not expense:
+                    continue
 
-            # Utiliser la logique de création ou récupération de la balance
-            balance_model = self.env['account.daily.balance']
-            balance = balance_model.search([
-                ('company_id', '=', company_id),
-                ('date', '=', today)
-            ], limit=1)
-
-            if balance:
-                # Si balance du jour existe déjà
-                balance.action_update_totals()
-            else:
-                # Récupérer la dernière balance pour cette société
-                last_balance = balance_model.search([
-                    ('company_id', '=', company_id)
-                ], order='date desc', limit=1)
-
-                if not last_balance or last_balance.etat == 'cloturer':
-                    vals = {
-                        'date': today,
-                        'company_id': company_id,
-                        'ancien_solde': last_balance.nouveau_solde if last_balance else 0.0
-                    }
-                    balance = balance_model.create(vals)
-                else:
-                    # Si la dernière balance est ouverte → utiliser la balance existante
-                    balance = last_balance
-
-                balance.action_update_totals()
+                operator = self.env['mobile.money.operator'].search([
+                    ('journal_id', '=', payment.journal_id.id),
+                    ('company_id', '=', payment.company_id.id),
+                    ('active', '=', True),
+                ], limit=1)
+                if operator:
+                    balance = self.env['account.daily.balance.mobile'].search([
+                        ('company_id', '=', payment.company_id.id),
+                        ('operator_id', '=', operator.id),
+                        ('date', '=', payment.date),
+                    ], limit=1)
+                    if not balance:
+                        balance = self.env['account.daily.balance.mobile'].create({
+                            'company_id': payment.company_id.id,
+                            'operator_id': operator.id,
+                            'date': payment.date,
+                        })
+                    self.env['account.daily.balance.mobile.line']._upsert_hr_expense_payment(
+                        balance, expense, payment
+                    )
+                    balance.action_update_totals_mobile()
+                elif payment.journal_id.type == 'cash':
+                    balance = self.env['account.daily.balance'].search([
+                        ('company_id', '=', payment.company_id.id),
+                        ('date', '=', payment.date),
+                    ], limit=1)
+                    if not balance:
+                        balance = self.env['account.daily.balance'].create({
+                            'company_id': payment.company_id.id,
+                            'date': payment.date,
+                        })
+                    self.env['account.daily.balance.line']._upsert_hr_expense_payment(
+                        balance, expense, payment
+                    )
+                    balance.action_update_totals()
 
         return res
 

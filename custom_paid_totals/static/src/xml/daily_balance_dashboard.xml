@@ -29,13 +29,13 @@
                         role="tab"
                         t-att-class="state.activeTab === 'expenses' ? 'active' : ''"
                         t-on-click="() => this.setActiveTab('expenses')">
-                    Dépenses
+                    Décaissements
                 </button>
                 <button type="button"
                         role="tab"
                         t-att-class="state.activeTab === 'sales' ? 'active' : ''"
                         t-on-click="() => this.setActiveTab('sales')">
-                    Ventes
+                    Encaissements
                 </button>
             </div>
 
