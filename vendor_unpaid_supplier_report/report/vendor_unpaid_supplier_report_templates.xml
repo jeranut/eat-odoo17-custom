@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="unpaid_vendor">
+        <t t-call="web.html_container">
+            <t t-set="o" t-value="wizard"/>
+            <t t-call="web.external_layout">
+                <div class="page">
+                    <h2>
+                        <t t-if="wizard.report_scope == 'customer'">État des impayés clients</t>
+                        <t t-else="">État des impayés fournisseurs</t>
+                    </h2>
+
+                    <div class="mb-3">
+                        <p>
+                            <strong>Période de facturation :</strong>
+                            <t t-if="wizard.print_mode == 'range'">
+                                <span t-esc="format_date(wizard.date_from)"/> au
+                                <span t-esc="format_date(wizard.date_to)"/>
+                            </t>
+                            <t t-else="">
+                                <span t-esc="format_date(wizard.report_date)"/>
+                            </t>
+                        </p>
+                        <p t-if="wizard.partner_ids">
+                            <strong>
+                                <t t-if="wizard.report_scope == 'customer'">Clients :</t>
+                                <t t-else="">Fournisseurs :</t>
+                            </strong>
+                            <span t-esc="', '.join(wizard.partner_ids.mapped('display_name'))"/>
+                        </p>
+                    </div>
+
+                    <table class="table table-sm o_main_table table-bordered">
+                        <thead>
+                            <tr>
+                                <th>Référence</th>
+                                <th>
+                                    <t t-if="wizard.report_scope == 'customer'">Client</t>
+                                    <t t-else="">Fournisseur</t>
+                                </th>
+                                <th>Date facture</th>
+                                <th>Date échéance</th>
+                                <th>Situation échéance</th>
+                                <th class="text-end">Montant total signé</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="docs" t-as="move">
+                                <td><span t-esc="move.name"/></td>
+                                <td><span t-esc="move.invoice_partner_display_name"/></td>
+                                <td><span t-esc="format_date(move.invoice_date)"/></td>
+                                <td t-att-class="'text-danger fw-bold' if is_overdue(move) else ''">
+                                    <span t-esc="format_date(move.invoice_date_due)"/>
+                                </td>
+                                <td><span t-esc="get_due_label(move)"/></td>
+                                <td class="text-end">
+                                    <span t-field="move.amount_total_signed" t-options="{'widget': 'monetary', 'display_currency': move.company_currency_id}"/>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="text-end mt-2">
+                        <strong>Total : </strong>
+                        <strong t-esc="format_amount(total_amount)"/>
+                    </div>
+
+                </div>
+            </t>
+        </t>
+    </template>
+</odoo>

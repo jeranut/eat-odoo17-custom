@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_report_vendor_unpaid_supplier" model="ir.actions.report">
+        <field name="name">État des impayés fournisseurs</field>
+        <field name="model">vendor.unpaid.supplier.report.wizard</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">vendor_unpaid_supplier_report.unpaid_vendor</field>
+        <field name="report_file">vendor_unpaid_supplier_report.unpaid_vendor</field>
+        <field name="print_report_name">'Etat_impayes_fournisseurs'</field>
+    </record>
+
+</odoo>
