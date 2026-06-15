@@ -292,12 +292,17 @@ class AccountDailyBalanceMobile(models.Model):
                 ('date', '>=', record.date),
             ])
             for payment in payments:
-                expense = payment.move_id.line_ids.expense_id[:1]
+                reconciled_moves = payment.reconciled_invoice_ids | payment.reconciled_bill_ids
+                expense = (
+                    payment.move_id.line_ids.expense_id[:1]
+                    or reconciled_moves.line_ids.expense_id[:1]
+                )
                 if expense:
                     self.env['account.daily.balance.mobile.line']._upsert_hr_expense_payment(
                         record, expense, payment
                     )
-                for move in payment.reconciled_invoice_ids | payment.reconciled_bill_ids:
+                    continue
+                for move in reconciled_moves:
                     self.env['account.daily.balance.mobile.line']._upsert_invoice_payment(
                         record, move, payment
                     )
@@ -448,6 +453,10 @@ class AccountDailyBalanceMobileLine(models.Model):
 
     @api.model
     def _upsert_invoice_payment(self, balance, move, payment):
+        expense = payment.move_id.line_ids.expense_id[:1] or move.line_ids.expense_id[:1]
+        if expense:
+            return self._upsert_hr_expense_payment(balance, expense, payment)
+
         payment_key = False if payment.id else self._payment_key(move, payment)
         existing = self.search([('payment_id', '=', payment.id)], limit=1)
         if not existing and payment_key:
