@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_treasury_analysis_report_graph" model="ir.ui.view">
+        <field name="name">treasury.analysis.report.graph</field>
+        <field name="model">treasury.analysis.report</field>
+        <field name="arch" type="xml">
+            <graph string="Évolution des encaissements et décaissements" type="line">
+                <field name="date" interval="day"/>
+                <field name="total_income" type="measure"/>
+                <field name="total_expense" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="view_treasury_analysis_report_pivot" model="ir.ui.view">
+        <field name="name">treasury.analysis.report.pivot</field>
+        <field name="model">treasury.analysis.report</field>
+        <field name="arch" type="xml">
+            <pivot string="Analyse des encaissements et décaissements">
+                <field name="date" type="row" interval="month"/>
+                <field name="source_type" type="col"/>
+                <field name="total_income" type="measure"/>
+                <field name="total_expense" type="measure"/>
+                <field name="balance_amount" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="view_treasury_analysis_report_tree" model="ir.ui.view">
+        <field name="name">treasury.analysis.report.tree</field>
+        <field name="model">treasury.analysis.report</field>
+        <field name="arch" type="xml">
+            <tree string="Contrôle des encaissements et décaissements"
+                  create="false" edit="false" delete="false">
+                <field name="date"/>
+                <field name="company_id"/>
+                <field name="source_type"/>
+                <field name="journal_id"/>
+                <field name="operator_id" optional="show"/>
+                <field name="total_income" sum="Total Encaissements"/>
+                <field name="total_expense" sum="Total Décaissements"/>
+                <field name="balance_amount" sum="Solde net"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_treasury_analysis_report_search" model="ir.ui.view">
+        <field name="name">treasury.analysis.report.search</field>
+        <field name="model">treasury.analysis.report</field>
+        <field name="arch" type="xml">
+            <search string="Analyse des encaissements et décaissements">
+                <field name="date"/>
+                <field name="company_id"/>
+                <field name="journal_id"/>
+                <field name="operator_id"/>
+                <field name="source_type"/>
+                <filter string="Tous" name="source_all" domain="[]"/>
+                <filter string="Caisse" name="source_cash"
+                        domain="[('source_type', '=', 'cash')]"/>
+                <filter string="Nouveaux journaux" name="source_configured"
+                        domain="[('source_type', '=', 'mobile_money')]"/>
+                <separator/>
+                <filter string="Jour" name="group_by_day"
+                        context="{'group_by': 'date:day'}"/>
+                <filter string="Semaine" name="group_by_week"
+                        context="{'group_by': 'date:week'}"/>
+                <filter string="Mois" name="group_by_month"
+                        context="{'group_by': 'date:month'}"/>
+                <group expand="0" string="Regrouper par">
+                    <filter string="Société" name="group_by_company"
+                            context="{'group_by': 'company_id'}"/>
+                    <filter string="Type" name="group_by_source"
+                            context="{'group_by': 'source_type'}"/>
+                    <filter string="Journal comptable" name="group_by_journal"
+                            context="{'group_by': 'journal_id'}"/>
+                    <filter string="Journal de trésorerie" name="group_by_operator"
+                            context="{'group_by': 'operator_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_treasury_analysis_report" model="ir.actions.act_window">
+        <field name="name">Recettes et Dépenses</field>
+        <field name="res_model">treasury.analysis.report</field>
+        <field name="view_mode">graph,pivot,tree</field>
+        <field name="search_view_id" ref="view_treasury_analysis_report_search"/>
+        <field name="domain">[('company_id', 'in', context.get('allowed_company_ids', []))]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Aucune donnée de trésorerie à analyser.
+            </p>
+        </field>
+    </record>
+
+    <record id="action_treasury_analysis_dashboard" model="ir.actions.client">
+        <field name="name">Recettes et Dépenses</field>
+        <field name="tag">custom_paid_totals.treasury_analysis_dashboard</field>
+    </record>
+
+    <menuitem id="menu_treasury_analysis"
+              name="Analyse"
+              parent="menu_paid_totals_main"
+              sequence="50"/>
+
+    <menuitem id="menu_treasury_analysis_report"
+              name="Recettes et Dépenses"
+              parent="menu_treasury_analysis"
+              action="action_treasury_analysis_dashboard"
+              sequence="10"/>
+</odoo>

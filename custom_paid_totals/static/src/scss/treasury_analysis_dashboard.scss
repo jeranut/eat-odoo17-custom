@@ -1,0 +1,149 @@
+.o_treasury_analysis_dashboard {
+    height: 100%;
+    overflow: auto;
+    background: #f7f5f6;
+}
+
+.treasury-analysis-page {
+    padding: 1.5rem;
+}
+
+.treasury-analysis-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+
+    h1 {
+        margin: 0;
+        color: #24171d;
+        font-size: clamp(1.65rem, 3vw, 2.7rem);
+        font-weight: 800;
+    }
+
+    p {
+        margin: 0.25rem 0 0;
+        color: #74656c;
+        font-size: 1rem;
+    }
+}
+
+.treasury-analysis-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.treasury-analysis-filters {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(145px, 1fr)) auto;
+    align-items: end;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: #ffffff;
+    border: 1px solid #e6dde1;
+    border-radius: 0.65rem;
+
+    label {
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+        margin: 0;
+
+        span {
+            color: #5e4c54;
+            font-size: 0.78rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+    }
+}
+
+.treasury-analysis-kpis {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+
+    article {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        padding: 1rem 1.15rem;
+        background: #ffffff;
+        border: 1px solid #e6dde1;
+        border-radius: 0.65rem;
+
+        span {
+            color: #74656c;
+            font-size: 0.82rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        strong {
+            color: #35252c;
+            font-size: 1.35rem;
+        }
+
+        .income {
+            color: #74304d;
+        }
+
+        .expense {
+            color: #d84a05;
+        }
+    }
+}
+
+.treasury-analysis-chart-card {
+    min-height: 580px;
+    padding: 1rem;
+    background: #ffffff;
+    border: 1px solid #e6dde1;
+    border-radius: 0.65rem;
+    box-shadow: 0 0.2rem 0.8rem rgba(72, 42, 55, 0.06);
+}
+
+.treasury-analysis-chart,
+.treasury-analysis-message {
+    width: 100%;
+    min-height: 540px;
+}
+
+.treasury-analysis-message {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #74656c;
+}
+
+@media (max-width: 1199.98px) {
+    .treasury-analysis-filters {
+        grid-template-columns: repeat(3, minmax(150px, 1fr));
+    }
+}
+
+@media (max-width: 767.98px) {
+    .treasury-analysis-page {
+        padding: 0.75rem;
+    }
+
+    .treasury-analysis-heading {
+        flex-direction: column;
+    }
+
+    .treasury-analysis-filters,
+    .treasury-analysis-kpis {
+        grid-template-columns: 1fr;
+    }
+
+    .treasury-analysis-actions {
+        width: 100%;
+
+        button {
+            flex: 1 1 50%;
+        }
+    }
+}

@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="custom_paid_totals.TreasuryAnalysisDashboard">
+        <div class="o_treasury_analysis_dashboard">
+            <Layout display="display">
+                <div class="treasury-analysis-page">
+                    <header class="treasury-analysis-heading">
+                        <div>
+                            <h1>Évolution des encaissements et décaissements</h1>
+                            <p>Tous les journaux de trésorerie</p>
+                        </div>
+                        <div class="treasury-analysis-actions">
+                            <button class="btn btn-outline-secondary" t-on-click="() => this.openReport('pivot')">Pivot</button>
+                            <button class="btn btn-outline-secondary" t-on-click="() => this.openReport('tree')">Liste de contrôle</button>
+                        </div>
+                    </header>
+
+                    <section class="treasury-analysis-filters">
+                        <label>
+                            <span>Période</span>
+                            <select class="form-select" t-att-value="state.filters.period"
+                                    t-on-change="(ev) => this.setFilter('period', ev.target.value)">
+                                <option value="day">Jour</option>
+                                <option value="week">Semaine</option>
+                                <option value="month">Mois</option>
+                            </select>
+                        </label>
+                        <label>
+                            <span>Date début</span>
+                            <input type="date" class="form-control" t-att-value="state.filters.date_from"
+                                   t-on-change="(ev) => this.setFilter('date_from', ev.target.value)"/>
+                        </label>
+                        <label>
+                            <span>Date fin</span>
+                            <input type="date" class="form-control" t-att-value="state.filters.date_to"
+                                   t-on-change="(ev) => this.setFilter('date_to', ev.target.value)"/>
+                        </label>
+                        <label>
+                            <span>Société</span>
+                            <select class="form-select" t-att-value="state.filters.company_id"
+                                    t-on-change="(ev) => this.setFilter('company_id', ev.target.value)">
+                                <option value="">Toutes les sociétés</option>
+                                <t t-foreach="state.data.companies" t-as="company" t-key="company.id">
+                                    <option t-att-value="company.id" t-out="company.name"/>
+                                </t>
+                            </select>
+                        </label>
+                        <label>
+                            <span>Type</span>
+                            <select class="form-select" t-att-value="state.filters.source_type"
+                                    t-on-change="(ev) => this.setFilter('source_type', ev.target.value)">
+                                <option value="">Tous</option>
+                                <option value="cash">Caisse</option>
+                                <option value="mobile_money">Nouveaux journaux</option>
+                            </select>
+                        </label>
+                        <label>
+                            <span>Journal</span>
+                            <select class="form-select" t-att-value="state.filters.operator_id"
+                                    t-on-change="(ev) => this.setFilter('operator_id', ev.target.value)">
+                                <option value="">Tous les journaux</option>
+                                <t t-foreach="state.data.operators" t-as="operator" t-key="operator.id">
+                                    <option t-att-value="operator.id" t-out="operator.name"/>
+                                </t>
+                            </select>
+                        </label>
+                        <button class="btn btn-light treasury-reset-filter" t-on-click="resetFilters">Réinitialiser</button>
+                    </section>
+
+                    <section class="treasury-analysis-kpis">
+                        <article>
+                            <span>Total Encaissements</span>
+                            <strong class="income" t-out="formatAmount(state.data.totals.income)"/>
+                        </article>
+                        <article>
+                            <span>Total Décaissements</span>
+                            <strong class="expense" t-out="formatAmount(state.data.totals.expense)"/>
+                        </article>
+                        <article>
+                            <span>Solde net</span>
+                            <strong t-out="formatAmount(state.data.totals.balance)"/>
+                        </article>
+                    </section>
+
+                    <section class="treasury-analysis-chart-card">
+                        <div t-if="state.loading" class="treasury-analysis-message">Chargement...</div>
+                        <div t-elif="state.error" class="treasury-analysis-message text-danger">
+                            Impossible de charger les données.
+                        </div>
+                        <div t-elif="!hasData" class="treasury-analysis-message">Aucune donnée à afficher</div>
+                        <div t-else="" t-ref="analysisChart" class="treasury-analysis-chart"/>
+                    </section>
+                </div>
+            </Layout>
+        </div>
+    </t>
+</templates>

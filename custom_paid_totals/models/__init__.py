@@ -6,4 +6,5 @@ from . import mobile_money_operator
 from . import paid_totals_mobile
 from . import account_payment_mobile
 from . import add_journal_pos
+from . import treasury_analysis_report
 #from . import account_payment_register
