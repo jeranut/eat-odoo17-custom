@@ -42,6 +42,20 @@ class AccountPaymentRegister(models.TransientModel):
             ('company_id', '=', self.company_id.id),
             ('active', '=', True),
         ], limit=1)
+        if (
+            self.payment_type == "outbound"
+            and self.partner_type == "supplier"
+            and self.journal_id.type == "bank"
+            and not operator
+        ):
+            raise UserError(_(
+                "Le journal de paiement « %(journal)s » n'est pas configuré dans la trésorerie "
+                "de la société « %(company)s ».\n\n"
+                "Configurez ce journal dans Trésorerie > Configuration > Journaux "
+                "avant de créer le paiement.",
+                journal=self.journal_id.display_name,
+                company=self.company_id.display_name,
+            ))
         if self.payment_type == "outbound" and self.partner_type == "supplier" and operator:
             # Récupération du dernier solde Mobile Money
             last_balance = self.env['account.daily.balance.mobile'].search(

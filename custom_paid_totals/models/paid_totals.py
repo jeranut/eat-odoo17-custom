@@ -648,6 +648,15 @@ class HrExpenseSheet(models.Model):
                         balance, expense, payment
                     )
                     balance.action_update_totals()
+                else:
+                    raise UserError(_(
+                        "Le journal de paiement « %(journal)s » n'est pas configuré dans la trésorerie "
+                        "de la société « %(company)s ».\n\n"
+                        "Configurez ce journal dans Trésorerie > Configuration > Journaux "
+                        "avant de comptabiliser la dépense.",
+                        journal=payment.journal_id.display_name,
+                        company=payment.company_id.display_name,
+                    ))
 
         return res
 

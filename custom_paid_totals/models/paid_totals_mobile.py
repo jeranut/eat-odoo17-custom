@@ -448,8 +448,7 @@ class AccountDailyBalanceMobileLine(models.Model):
     company_id = fields.Many2one(
         'res.company',
         string='Company',
-        related='balance_id.company_id',
-        store=True,
+        required=True,
         readonly=True,
     )
 
@@ -461,6 +460,24 @@ class AccountDailyBalanceMobileLine(models.Model):
             'Cette opération existe déjà dans une balance Mobile Money.',
         ),
     ]
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        normalized_vals_list = []
+        for vals in vals_list:
+            vals = dict(vals)
+            balance = self.env['account.daily.balance.mobile'].browse(vals.get('balance_id')).exists()
+            if balance:
+                vals['company_id'] = balance.company_id.id
+            normalized_vals_list.append(vals)
+        return super().create(normalized_vals_list)
+
+    def write(self, vals):
+        if vals.get('balance_id'):
+            balance = self.env['account.daily.balance.mobile'].browse(vals['balance_id']).exists()
+            if balance:
+                vals = dict(vals, company_id=balance.company_id.id)
+        return super().write(vals)
 
     @api.model
     def _payment_key(self, move, payment):
