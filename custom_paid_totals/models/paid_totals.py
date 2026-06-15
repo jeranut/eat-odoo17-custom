@@ -375,8 +375,15 @@ class AccountDailyBalanceLine(models.Model):
     _description = 'Ligne du rapport journalier Encaissements/Décaissements'
     _order = 'id asc'
     _rec_name = 'reference'
+    _check_company_auto = True
 
-    balance_id = fields.Many2one('account.daily.balance', string='Balance', ondelete='cascade')
+    balance_id = fields.Many2one(
+        'account.daily.balance',
+        string='Balance',
+        ondelete='cascade',
+        required=True,
+        check_company=True,
+    )
     reference = fields.Char(string='REFERENCE FACTURE')
     libelle = fields.Char(string='LIBELLE')
     payment = fields.Char(string='PAYMENT')
@@ -386,17 +393,25 @@ class AccountDailyBalanceLine(models.Model):
     origin_line_id = fields.Many2one(
         'account.daily.balance.line',
         string="Ligne d'origine",
-        readonly=True
+        readonly=True,
+        check_company=True,
     )
     expense_id = fields.Many2one(
         'hr.expense',
         string='Dépense RH',
         readonly=True,
+        check_company=True,
     )
     categorie = fields.Char(string="Catégorie")
-    payment_id = fields.Many2one('account.payment', string='Paiement comptable', readonly=True, index=True)
-    move_id = fields.Many2one('account.move', string='Facture', readonly=True, index=True)
-    journal_id = fields.Many2one('account.journal', string='Journal', readonly=True, index=True)
+    payment_id = fields.Many2one(
+        'account.payment', string='Paiement comptable', readonly=True, index=True, check_company=True
+    )
+    move_id = fields.Many2one(
+        'account.move', string='Facture', readonly=True, index=True, check_company=True
+    )
+    journal_id = fields.Many2one(
+        'account.journal', string='Journal', readonly=True, index=True, check_company=True
+    )
     payment_date = fields.Date(string='Date du paiement', readonly=True, index=True)
     payment_key = fields.Char(string='Clé anti-doublon', readonly=True, index=True)
     # company_id lié à la balance pour compatibilité multientreprise
@@ -548,12 +563,12 @@ class AccountPaymentRegister(models.TransientModel):
         if self.journal_id.type == "cash":
             balance = self.env['account.daily.balance'].search([
                 ('date', '=', payment_date),
-                ('company_id', '=', self.env.company.id),
+                ('company_id', '=', self.company_id.id),
             ], limit=1)
             if not balance:
                 balance = self.env['account.daily.balance'].create({
                     'date': payment_date,
-                    'company_id': self.env.company.id
+                    'company_id': self.company_id.id,
                 })
             balance.action_update_totals()
 

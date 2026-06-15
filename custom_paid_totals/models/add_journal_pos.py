@@ -52,7 +52,6 @@ class PosSession(models.Model):
                     "payment": "cash",
                     "debit": 0.00,
                     "credit": amount,
-                    "company_id": company_id,
                 })
 
                 balance.action_update_totals()
@@ -83,7 +82,6 @@ class PosSession(models.Model):
                 "debit": 0.0,
                 "credit": amount,
                 "regule_badge": "",
-                "company_id": self.company_id.id,
             })
 
             balance_mobile.action_update_totals_mobile()

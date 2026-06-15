@@ -47,6 +47,7 @@ class AccountDailyBalanceMobile(models.Model):
     _name = 'account.daily.balance.mobile'
     _description = 'Rapport journalier Encaissements/Décaissements par journal'
     _rec_name = 'date'
+    _check_company_auto = True
 
     date = fields.Date(string='Date', required=True, default=fields.Date.context_today, readonly=True)
     total_debit = fields.Float(string='Total Décaissements', readonly=True)
@@ -403,8 +404,15 @@ class AccountDailyBalanceMobileLine(models.Model):
     _description = 'Ligne du journal de trésorerie'
     _order = 'id asc'
     _rec_name = 'reference'
+    _check_company_auto = True
 
-    balance_id = fields.Many2one('account.daily.balance.mobile', string='Balance', ondelete='cascade')
+    balance_id = fields.Many2one(
+        'account.daily.balance.mobile',
+        string='Balance',
+        ondelete='cascade',
+        required=True,
+        check_company=True,
+    )
     operator_id = fields.Many2one(
         'mobile.money.operator',
         string='Journal de trésorerie',
@@ -418,19 +426,31 @@ class AccountDailyBalanceMobileLine(models.Model):
     debit = fields.Float(string='DÉCAISSEMENT')
     credit = fields.Float(string='ENCAISSEMENT')
     regule_badge = fields.Char(string="Badge", compute="_compute_regule_badge", store=True)
-    origin_line_id = fields.Many2one('account.daily.balance.mobile.line', string="Ligne d'origine", readonly=True)
-    expense_id = fields.Many2one('hr.expense', string='Dépense RH', readonly=True)
+    origin_line_id = fields.Many2one(
+        'account.daily.balance.mobile.line',
+        string="Ligne d'origine",
+        readonly=True,
+        check_company=True,
+    )
+    expense_id = fields.Many2one('hr.expense', string='Dépense RH', readonly=True, check_company=True)
     categorie = fields.Char(string="Catégorie")
-    payment_id = fields.Many2one('account.payment', string='Paiement comptable', readonly=True, index=True)
-    move_id = fields.Many2one('account.move', string='Facture', readonly=True, index=True)
-    journal_id = fields.Many2one('account.journal', string='Journal', readonly=True, index=True)
+    payment_id = fields.Many2one(
+        'account.payment', string='Paiement comptable', readonly=True, index=True, check_company=True
+    )
+    move_id = fields.Many2one(
+        'account.move', string='Facture', readonly=True, index=True, check_company=True
+    )
+    journal_id = fields.Many2one(
+        'account.journal', string='Journal', readonly=True, index=True, check_company=True
+    )
     payment_date = fields.Date(string='Date du paiement', readonly=True, index=True)
     payment_key = fields.Char(string='Clé anti-doublon', readonly=True, index=True)
     company_id = fields.Many2one(
         'res.company',
         string='Company',
-        default=lambda self: self.env.company.id,
-        required=True
+        related='balance_id.company_id',
+        store=True,
+        readonly=True,
     )
 
     _sql_constraints = [
@@ -489,7 +509,6 @@ class AccountDailyBalanceMobileLine(models.Model):
             'journal_id': payment.journal_id.id,
             'payment_date': payment.date,
             'payment_key': payment_key,
-            'company_id': balance.company_id.id,
         }
         if existing:
             if existing.balance_id.etats == 'ouvert':
@@ -671,25 +690,26 @@ class RetraitWizard(models.TransientModel):
     reference = fields.Char(string="Référence", readonly=True)
     motif = fields.Char(string="Motif", required=True)
     montant = fields.Float(string="Montant", required=True)
-    company_id = fields.Many2one(
-        'res.company',
-        string='Company',
-        required=True,
-        default=lambda self: self.env.company
-    )
     balance_id = fields.Many2one(
         'account.daily.balance.mobile',
         string='Balance Mobile Money',
         required=True,
         domain="[('company_id', '=', company_id), ('etats', '=', 'ouvert')]",
     )
+    company_id = fields.Many2one(
+        'res.company',
+        string='Company',
+        related='balance_id.company_id',
+        readonly=True,
+    )
 
-    def _generate_reference(self):
+    def _generate_reference(self, company_id=None):
         current_year = datetime.now().year
         prefix = f"RET/{current_year}/"
+        company_id = company_id or self.env.company.id
 
         last_line = self.env["account.daily.balance.mobile.line"].search(
-            [("reference", "like", prefix + "%"), ("company_id", "=", self.env.company.id)],
+            [("reference", "like", prefix + "%"), ("company_id", "=", company_id)],
             order="id desc",
             limit=1
         )
@@ -705,7 +725,11 @@ class RetraitWizard(models.TransientModel):
     @api.model
     def default_get(self, fields):
         res = super().default_get(fields)
-        res["reference"] = self._generate_reference()
+        balance_id = res.get("balance_id") or self.env.context.get("default_balance_id")
+        balance = self.env["account.daily.balance.mobile"].browse(balance_id).exists()
+        res["reference"] = self._generate_reference(
+            balance.company_id.id if balance else self.env.company.id
+        )
         return res
 
     def action_confirm_retrait(self):
@@ -725,7 +749,6 @@ class RetraitWizard(models.TransientModel):
             "debit": self.montant,
             "credit": 0.0,
             "regule_badge": "",
-            "company_id": balance_obj.company_id.id,
         }
 
         self.env["account.daily.balance.mobile.line"].create(line_vals)
