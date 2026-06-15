@@ -2,7 +2,7 @@
 {
     "name": "Vendor Unpaid Supplier Report",
     "summary": "Impression PDF de l'état des impayés fournisseurs",
-    "version": "17.0.1.3.1",
+    "version": "17.0.1.4.0",
     "category": "Accounting/Accounting",
     "author": "SysAdaptPro",
     "license": "LGPL-3",

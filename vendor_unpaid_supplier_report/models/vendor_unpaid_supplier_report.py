@@ -38,12 +38,15 @@ class ReportVendorUnpaidSupplier(models.AbstractModel):
         ).exists()
         moves = self.env["account.move"].browse(data.get("move_ids", [])).exists()
         company = moves[:1].company_id or self.env.company
+        document = moves[:1]
         return {
             "doc_ids": moves.ids,
             "doc_model": "account.move",
             "docs": moves,
+            "doc": document,
             "wizard": wizard,
             "company_id": company,
+            "company": company,
             "total_amount": sum(moves.mapped("amount_total_signed")),
             "get_due_label": self._get_due_label,
             "is_overdue": self._is_overdue,
