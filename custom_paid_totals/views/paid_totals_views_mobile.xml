@@ -318,7 +318,8 @@
         <field name="name">Journaux</field>
         <field name="res_model">mobile.money.operator</field>
         <field name="view_mode">tree,form</field>
-        <field name="domain">[('company_id','in',context.get('allowed_company_ids', []))]</field>
+        <field name="domain">[('company_id', '=', context.get('allowed_company_ids', [False])[0])]</field>
+        <field name="context">{'default_company_id': context.get('allowed_company_ids', [False])[0]}</field>
     </record>
     <record id="menu_mobile_journal" model="ir.ui.menu">
         <field name="name">Tous les journaux</field>

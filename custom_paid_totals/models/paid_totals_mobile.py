@@ -185,10 +185,24 @@ class AccountDailyBalanceMobile(models.Model):
         if not operator_id:
             return defaults
 
+        operator = self.env['mobile.money.operator'].browse(operator_id).exists()
+        if not operator:
+            return defaults
+        if operator.company_id != self.env.company:
+            raise UserError(_(
+                "Le journal « %(journal)s » appartient à la société « %(journal_company)s », "
+                "mais la société active est « %(active_company)s ».\n\n"
+                "Rechargez la page après avoir sélectionné la bonne société.",
+                journal=operator.display_name,
+                journal_company=operator.company_id.display_name,
+                active_company=self.env.company.display_name,
+            ))
+        defaults['company_id'] = operator.company_id.id
+
         today = fields.Date.context_today(self)
         last_balance = self.search(
             [
-                ('company_id', '=', self.env.company.id),
+                ('company_id', '=', operator.company_id.id),
                 ('operator_id', '=', operator_id),
                 ('date', '<=', today),
             ],
@@ -220,10 +234,14 @@ class AccountDailyBalanceMobile(models.Model):
     def create(self, vals):
         """Créer ou réutiliser la balance Mobile Money du jour."""
         today = fields.Date.context_today(self)
-        company_id = vals.get('company_id') or self.env.company.id
         operator_id = vals.get('operator_id')
         if not operator_id:
             raise UserError(_("Veuillez sélectionner un opérateur Mobile Money."))
+        operator = self.env['mobile.money.operator'].browse(operator_id).exists()
+        if not operator:
+            raise UserError(_("Le journal de trésorerie sélectionné n'existe plus."))
+        company_id = operator.company_id.id
+        vals['company_id'] = company_id
 
         date_record = vals.get('date') or today
         if isinstance(date_record, str):

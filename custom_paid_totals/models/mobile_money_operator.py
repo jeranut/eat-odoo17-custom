@@ -51,6 +51,13 @@ class MobileMoneyOperator(models.Model):
         ),
     ]
 
+    @api.model
+    def default_get(self, fields_list):
+        defaults = super().default_get(fields_list)
+        if 'company_id' in fields_list:
+            defaults['company_id'] = self.env.company.id
+        return defaults
+
     def _sync_treasury_menu(self):
         parent_menu = self.env.ref('custom_paid_totals.menu_paid_totals_list')
         user_group = self.env.ref('custom_paid_totals.group_paid_totals_user')
