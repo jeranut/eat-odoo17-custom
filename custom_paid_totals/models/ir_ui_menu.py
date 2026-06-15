@@ -9,7 +9,23 @@ class IrUiMenu(models.Model):
 
     def load_menus(self, debug):
         menus = deepcopy(super().load_menus(debug))
-        hidden_menu_ids = set(self.env['mobile.money.operator'].sudo().with_context(
+        parent_menu = self.env.ref('custom_paid_totals.menu_paid_totals_list')
+        all_operator_menus = self.sudo().with_context(active_test=False).search([
+            ('parent_id', '=', parent_menu.id),
+        ]).filtered(
+            lambda menu: (
+                menu.action
+                and menu.action._name == 'ir.actions.act_window'
+                and menu.action.res_model == 'account.daily.balance.mobile'
+            )
+        )
+        allowed_menu_ids = set(self.env['mobile.money.operator'].sudo().search([
+            ('company_id', '=', self.env.company.id),
+            ('treasury_menu_id', '!=', False),
+        ]).mapped('treasury_menu_id').ids)
+        hidden_menu_ids = set(all_operator_menus.ids) - allowed_menu_ids
+
+        hidden_menu_ids.update(self.env['mobile.money.operator'].sudo().with_context(
             active_test=False,
         ).search([
             ('treasury_menu_id', '!=', False),
