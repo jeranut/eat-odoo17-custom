@@ -4,14 +4,17 @@
     'summary': 'Rapport journalier des totaux débit/crédit',
     'category': 'Accounting',
     'author': 'Sysadptpro',
-    'depends': ['account', 'hr_expense', 'web', 'point_of_sale'],
+    'depends': ['account', 'hr_expense', 'web', 'point_of_sale', 'mail'],
     'data': [
         'security/groups.xml',
         'security/ir.model.access.csv',
+        'data/advance_payment_sequence.xml',
         'views/paid_totals_views.xml',
         'views/paid_totals_views_mobile.xml',
+        'views/res_config_settings_views.xml',
         'views/treasury_analysis_report_views.xml',
         'views/journal_libel.xml',
+        'views/advance_payment_views.xml',
         'views/invoice_date_read_only.xml',
         'data/cron_account_daily_balance.xml',
 

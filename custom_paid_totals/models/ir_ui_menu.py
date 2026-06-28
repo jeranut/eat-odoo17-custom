@@ -4,6 +4,9 @@ from copy import deepcopy
 from odoo import models
 
 
+SG_EAT_DEPOT_COMPANY_NAME = "SG-EAT DEPOT"
+
+
 class IrUiMenu(models.Model):
     _inherit = 'ir.ui.menu'
 
@@ -31,6 +34,15 @@ class IrUiMenu(models.Model):
             ('treasury_menu_id', '!=', False),
             ('company_id', '!=', self.env.company.id),
         ]).mapped('treasury_menu_id').ids)
+
+        if self.env.company.name != SG_EAT_DEPOT_COMPANY_NAME:
+            for xmlid in (
+                'custom_paid_totals.menu_custom_paid_advance_payment',
+                'custom_paid_totals.menu_custom_paid_advance_payment_config',
+            ):
+                advance_menu = self.env.ref(xmlid, raise_if_not_found=False)
+                if advance_menu:
+                    hidden_menu_ids.add(advance_menu.id)
 
         pending_menu_ids = list(hidden_menu_ids)
         while pending_menu_ids:

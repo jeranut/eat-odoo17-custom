@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_custom_paid_advance_payment_tree" model="ir.ui.view">
+        <field name="name">custom.paid.advance.payment.tree</field>
+        <field name="model">custom.paid.advance.payment</field>
+        <field name="arch" type="xml">
+            <tree string="Avances sur Payment">
+                <field name="name"/>
+                <field name="payment_date"/>
+                <field name="company_id"/>
+                <field name="partner_id"/>
+                <field name="journal_id"/>
+                <field name="amount" widget="monetary" options="{'currency_field': 'currency_id'}"/>
+                <field name="used_amount" widget="monetary" options="{'currency_field': 'currency_id'}"/>
+                <field name="residual_amount" widget="monetary" options="{'currency_field': 'currency_id'}"/>
+                <field name="state" widget="badge"
+                       decoration-info="state == 'draft'"
+                       decoration-success="state == 'paid'"
+                       decoration-warning="state == 'partial'"
+                       decoration-muted="state == 'used'"
+                       decoration-danger="state == 'cancelled'"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_custom_paid_advance_payment_form" model="ir.ui.view">
+        <field name="name">custom.paid.advance.payment.form</field>
+        <field name="model">custom.paid.advance.payment</field>
+        <field name="arch" type="xml">
+            <form string="Avance sur Payment">
+                <header>
+                    <button name="action_pay" type="object" string="Payer" class="btn-primary"
+                            groups="custom_paid_totals.group_advance_payment_manager"
+                            invisible="state != 'draft'"/>
+                    <button name="action_cancel" type="object" string="Annuler" class="btn-secondary"
+                            groups="custom_paid_totals.group_advance_payment_manager"
+                            invisible="state in ('cancelled', 'partial', 'used')"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,paid,partial,used,cancelled"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="company_id" readonly="state != 'draft'"/>
+                            <field name="partner_id" readonly="state != 'draft'"
+                                   domain="['|', ('company_id', '=', False), ('company_id', '=', company_id)]"/>
+                            <field name="amount" readonly="state != 'draft'"
+                                   widget="monetary" options="{'currency_field': 'currency_id'}"/>
+                            <field name="currency_id" readonly="state != 'draft'"/>
+                            <field name="journal_id" readonly="state != 'draft'"
+                                   domain="[('company_id', '=', company_id), ('type', 'in', ('cash', 'bank'))]"/>
+                        </group>
+                        <group>
+                            <field name="payment_date" readonly="state != 'draft'"/>
+                            <field name="residual_amount" readonly="1"
+                                   widget="monetary" options="{'currency_field': 'currency_id'}"/>
+                            <field name="used_amount" readonly="1"
+                                   widget="monetary" options="{'currency_field': 'currency_id'}"/>
+                            <field name="move_id" readonly="1"/>
+                            <field name="invoice_ids" widget="many2many_tags" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Note">
+                            <field name="note" placeholder="Commentaire"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="activity_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_custom_paid_advance_payment_search" model="ir.ui.view">
+        <field name="name">custom.paid.advance.payment.search</field>
+        <field name="model">custom.paid.advance.payment</field>
+        <field name="arch" type="xml">
+            <search string="Avances sur Payment">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="company_id"/>
+                <field name="journal_id"/>
+                <filter string="Brouillon" name="draft" domain="[('state', '=', 'draft')]"/>
+                <filter string="Payé" name="paid" domain="[('state', '=', 'paid')]"/>
+                <filter string="Partiellement utilisé" name="partial" domain="[('state', '=', 'partial')]"/>
+                <filter string="Utilisé" name="used" domain="[('state', '=', 'used')]"/>
+                <filter string="Annulé" name="cancelled" domain="[('state', '=', 'cancelled')]"/>
+                <separator/>
+                <filter string="Disponible" name="available"
+                        domain="[('state', 'in', ('paid', 'partial')), ('residual_amount', '&gt;', 0)]"/>
+                <group expand="0" string="Regrouper par">
+                    <filter string="Société" name="group_company" context="{'group_by': 'company_id'}"/>
+                    <filter string="Client" name="group_partner" context="{'group_by': 'partner_id'}"/>
+                    <filter string="Journal" name="group_journal" context="{'group_by': 'journal_id'}"/>
+                    <filter string="État" name="group_state" context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_custom_paid_advance_payment_confirm_wizard_form" model="ir.ui.view">
+        <field name="name">custom.paid.advance.payment.confirm.wizard.form</field>
+        <field name="model">custom.paid.advance.payment.confirm.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Confirmation">
+                <field name="advance_id" invisible="1"/>
+                <group>
+                    <field name="message" nolabel="1"/>
+                </group>
+                <footer>
+                    <button string="Confirmer" type="object" name="action_confirm" class="btn-primary"/>
+                    <button string="Annuler" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_custom_paid_advance_payment_use_wizard_form" model="ir.ui.view">
+        <field name="name">custom.paid.advance.payment.use.wizard.form</field>
+        <field name="model">custom.paid.advance.payment.use.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Utilisation de l'avance">
+                <field name="currency_id" invisible="1"/>
+                <group>
+                    <field name="message" nolabel="1" readonly="1"/>
+                    <field name="available_amount" widget="monetary"
+                           options="{'currency_field': 'currency_id'}" readonly="1"/>
+                    <field name="remaining_amount" widget="monetary"
+                           options="{'currency_field': 'currency_id'}" readonly="1"/>
+                </group>
+                <footer>
+                    <button string="Confirmer" type="object" name="action_confirm" class="btn-primary"/>
+                    <button string="Annuler" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_custom_paid_advance_payment_journal_wizard_form" model="ir.ui.view">
+        <field name="name">custom.paid.advance.payment.journal.wizard.form</field>
+        <field name="model">custom.paid.advance.payment.journal.wizard</field>
+        <field name="arch" type="xml">
+            <form string="AVANCE SUR PAYMENT">
+                <field name="cash_balance_id" invisible="1"/>
+                <field name="bank_balance_id" invisible="1"/>
+                <field name="company_id" invisible="1"/>
+                <field name="journal_id" invisible="1"/>
+                <field name="payment_date" invisible="1"/>
+                <field name="currency_id" invisible="1"/>
+                <group>
+                    <field name="partner_id"
+                           domain="['|', ('company_id', '=', False), ('company_id', '=', company_id)]"/>
+                    <field name="amount" widget="monetary" options="{'currency_field': 'currency_id'}"/>
+                </group>
+                <footer>
+                    <button string="Confirmer" type="object" name="action_confirm" class="btn-primary"/>
+                    <button string="Annuler" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_account_payment_register_form_advance_payment" model="ir.ui.view">
+        <field name="name">account.payment.register.form.advance.payment</field>
+        <field name="model">account.payment.register</field>
+        <field name="inherit_id" ref="account.view_account_payment_register_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='amount']/ancestor::group[1]" position="after">
+                <group string="Avance sur Payment"
+                       invisible="partner_type != 'customer' or available_advance_amount == 0">
+                    <field name="use_advance_payment"/>
+                    <field name="available_advance_amount" readonly="1"
+                           widget="monetary" options="{'currency_field': 'currency_id'}"/>
+                    <field name="original_payment_amount" readonly="1"
+                           widget="monetary" options="{'currency_field': 'currency_id'}"/>
+                    <field name="advance_amount_to_use"
+                           widget="monetary" options="{'currency_field': 'currency_id'}"
+                           invisible="not use_advance_payment"/>
+                    <field name="residual_after_advance" readonly="1"
+                           widget="monetary" options="{'currency_field': 'currency_id'}"
+                           invisible="not use_advance_payment"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="action_custom_paid_advance_payment" model="ir.actions.act_window">
+        <field name="name">Avance sur Payment</field>
+        <field name="res_model">custom.paid.advance.payment</field>
+        <field name="view_mode">tree,form</field>
+        <field name="domain">[('company_id.name', '=', 'SG-EAT DEPOT'), ('company_id', 'in', context.get('allowed_company_ids', []))]</field>
+        <field name="context">{'default_company_id': context.get('allowed_company_ids', [False])[0]}</field>
+    </record>
+
+    <menuitem id="menu_custom_paid_advance_payment"
+              name="Avances sur Payment"
+              parent="menu_paid_totals_main"
+              action="action_custom_paid_advance_payment"
+              sequence="20"
+              groups="custom_paid_totals.group_paid_totals_user"/>
+</odoo>

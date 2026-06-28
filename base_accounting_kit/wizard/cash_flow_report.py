@@ -129,6 +129,9 @@ class AccountingReport(models.TransientModel):
     def _print_report(self, data):
         raise NotImplementedError()
 
+    def get_account_lines(self, data):
+        return self.env['report.base_accounting_kit.report_cash_flow'].get_account_lines(data)
+
     def _print_report(self, data):
         data['form'].update(self.read(
             ['date_from_cmp', 'debit_credit', 'date_to_cmp', 'filter_cmp',

@@ -32,10 +32,16 @@
         <field name="arch" type="xml">
             <form string="Journal de trésorerie">
                 <header>
+                    <field name="show_advance_payment_button" invisible="1"/>
 
                     <button name="action_update_totals_wizard_mobile" type="object" string="DEPOT"
                             class="oe_highlight"
                             invisible="etats == 'cloturer'"/>
+                    <button name="action_open_advance_payment_wizard"
+                            type="object"
+                            string="AVANCE SUR PAYMENT"
+                            class="btn-primary"
+                            invisible="etats == 'cloturer' or not show_advance_payment_button"/>
                     <button name="action_open_retrait_wizard"
                             type="object"
                             string="RETRAIT"

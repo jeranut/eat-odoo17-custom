@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_advance_payment" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.advance.payment</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="account.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//app[@name='account']" position="inside">
+                <block title="Avances sur Payment" name="custom_paid_advance_payment_settings">
+                    <setting id="custom_paid_advance_payment_account"
+                             string="Avances sur Payment"
+                             company_dependent="1"
+                             help="Compte d'attente utilisé pour enregistrer et imputer les avances clients.">
+                        <field name="advance_payment_account_id"
+                               domain="[('deprecated', '=', False)]"/>
+                    </setting>
+                </block>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_custom_paid_advance_payment_settings_form" model="ir.ui.view">
+        <field name="name">custom.paid.advance.payment.settings.form</field>
+        <field name="model">custom.paid.advance.payment.settings</field>
+        <field name="arch" type="xml">
+            <form string="Avances sur Payment">
+                <sheet>
+                    <group string="Avances sur Payment">
+                        <field name="company_id" groups="base.group_multi_company"/>
+                        <field name="advance_payment_account_id"
+                               domain="[('deprecated', '=', False)]"
+                               required="1"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button string="Enregistrer" name="action_save" type="object" class="btn-primary"/>
+                    <button string="Annuler" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_custom_paid_advance_payment_config" model="ir.actions.act_window">
+        <field name="name">Avances sur Payment</field>
+        <field name="res_model">custom.paid.advance.payment.settings</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'default_company_id': context.get('allowed_company_ids', [False])[0]}</field>
+    </record>
+
+    <menuitem id="menu_custom_paid_advance_payment_config"
+              name="Avances sur Payment"
+              parent="menu_paid_totals_configuration"
+              action="action_custom_paid_advance_payment_config"
+              sequence="20"
+              groups="custom_paid_totals.group_paid_totals_user"/>
+</odoo>

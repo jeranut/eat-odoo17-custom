@@ -68,29 +68,14 @@ class ReportFinancial(models.AbstractModel):
                 continue
             res[report.id] = dict((fn, 0.0) for fn in fields)
             if report.type == 'accounts':
-                # it's the sum of credit or debit
-                res2 = self._compute_report_balance(report.parent_id)
-                for key, value in res2.items():
-                    cash_in_operation = self.env.ref(
-                        'base_accounting_kit.cash_in_from_operation0')
-                    cash_out_operation = self.env.ref(
-                        'base_accounting_kit.cash_out_operation1')
-                    cash_in_financial = self.env.ref(
-                        'base_accounting_kit.cash_in_financial0')
-                    cash_out_financial = self.env.ref(
-                        'base_accounting_kit.cash_out_financial1')
-                    cash_in_investing = self.env.ref(
-                        'base_accounting_kit.cash_in_investing0')
-                    cash_out_investing = self.env.ref(
-                        'base_accounting_kit.cash_out_investing1')
-                    if (report == cash_in_operation or report ==
-                            cash_in_financial or report == cash_in_investing):
-                        res[report.id]['debit'] += value['debit']
-                        res[report.id]['balance'] += value['debit']
-                    elif (report == cash_out_operation or report ==
-                          cash_out_financial or report == cash_out_investing):
-                        res[report.id]['credit'] += value['credit']
-                        res[report.id]['balance'] += -(value['credit'])
+                accounts = self._get_cash_flow_accounts(report)
+                res[report.id]['account'] = self._compute_account_balance(
+                    accounts)
+                for value in res[report.id]['account'].values():
+                    res[report.id]['debit'] += value.get('debit')
+                    res[report.id]['credit'] += value.get('credit')
+                    res[report.id]['balance'] += self._get_cash_flow_account_line_balance(
+                        report, value)
             elif report.type == 'account_type':
                 # it's the sum the leaf accounts with such an account type
                 accounts = self.env['account.account'].search(
@@ -108,13 +93,94 @@ class ReportFinancial(models.AbstractModel):
                     for field in fields:
                         res[report.id][field] += value.get(field)
             elif report.type == 'sum':
-                # it's the sum of the linked accounts
-                res[report.id]['account'] = self._compute_account_balance(
-                    report.account_ids)
-                for values in res[report.id]['account'].values():
+                res2 = self._compute_report_balance(report.children_ids)
+                for values in res2.values():
                     for field in fields:
                         res[report.id][field] += values.get(field)
         return res
+
+    def _get_cash_flow_accounts(self, report):
+        accounts = report.account_ids
+        if report.parent_id:
+            accounts |= report.parent_id.account_ids
+        if 'cash_flow_type' in self.env['account.account']._fields:
+            accounts |= self.env['account.account'].search([
+                ('cash_flow_type', 'in', [report.id, report.parent_id.id]),
+            ])
+        if not accounts and self._use_account_type_fallback():
+            accounts = self._get_cash_flow_fallback_accounts(report)
+        return accounts
+
+    def _use_account_type_fallback(self):
+        if 'cash_flow_type' not in self.env['account.account']._fields:
+            return True
+        configured_accounts = self.env['account.account'].search_count([
+            ('cash_flow_type', '!=', False),
+        ])
+        cash_flow_root = self.env.ref(
+            'base_accounting_kit.account_financial_report_cash_flow0')
+        configured_report_accounts = self.env['account.financial.report'].search_count([
+            ('parent_id', '=', cash_flow_root.id),
+            ('account_ids', '!=', False),
+        ])
+        return not configured_accounts and not configured_report_accounts
+
+    def _get_cash_flow_fallback_accounts(self, report):
+        account_types = []
+        if self._is_operation_cash_in_report(report):
+            account_types = ['income', 'income_other']
+        elif self._is_operation_cash_out_report(report):
+            account_types = ['expense', 'expense_depreciation', 'expense_direct_cost']
+        elif self._is_investing_cash_report(report):
+            account_types = ['asset_fixed', 'asset_non_current']
+        elif self._is_financing_cash_report(report):
+            account_types = [
+                'equity', 'liability_payable', 'liability_current',
+                'liability_non_current', 'liability_credit_card',
+            ]
+        if not account_types:
+            return self.env['account.account']
+        return self.env['account.account'].search([
+            ('account_type', 'in', account_types),
+        ])
+
+    def _uses_fallback_balance_sign(self, report):
+        return self._use_account_type_fallback() and (
+            self._is_cash_in_report(report) or self._is_cash_out_report(report))
+
+    def _is_operation_cash_in_report(self, report):
+        return report == self.env.ref('base_accounting_kit.cash_in_from_operation0')
+
+    def _is_operation_cash_out_report(self, report):
+        return report == self.env.ref('base_accounting_kit.cash_out_operation1')
+
+    def _is_investing_cash_report(self, report):
+        return report in self.env['account.financial.report'].browse([
+            self.env.ref('base_accounting_kit.cash_in_investing0').id,
+            self.env.ref('base_accounting_kit.cash_out_investing1').id,
+        ])
+
+    def _is_financing_cash_report(self, report):
+        return report in self.env['account.financial.report'].browse([
+            self.env.ref('base_accounting_kit.cash_in_financial0').id,
+            self.env.ref('base_accounting_kit.cash_out_financial1').id,
+        ])
+
+    def _is_cash_in_report(self, report):
+        cash_in_reports = self.env['account.financial.report'].browse([
+            self.env.ref('base_accounting_kit.cash_in_from_operation0').id,
+            self.env.ref('base_accounting_kit.cash_in_financial0').id,
+            self.env.ref('base_accounting_kit.cash_in_investing0').id,
+        ])
+        return report in cash_in_reports
+
+    def _is_cash_out_report(self, report):
+        cash_out_reports = self.env['account.financial.report'].browse([
+            self.env.ref('base_accounting_kit.cash_out_operation1').id,
+            self.env.ref('base_accounting_kit.cash_out_financial1').id,
+            self.env.ref('base_accounting_kit.cash_out_investing1').id,
+        ])
+        return report in cash_out_reports
 
     def get_account_lines(self, data):
         lines = []
@@ -136,6 +202,9 @@ class ReportFinancial(models.AbstractModel):
                         report_acc[account_id]['comp_bal'] = val['balance']
         for report in child_reports:
             vals = {
+                'id': report.id,
+                'r_id': report.id,
+                'parent': report.parent_id.id or False,
                 'name': report.name,
                 'balance': res[report.id]['balance'] * int(report.sign),
                 'type': 'report',
@@ -167,12 +236,17 @@ class ReportFinancial(models.AbstractModel):
                     flag = False
                     account = self.env['account.account'].browse(account_id)
                     vals = {
+                        'id': '%s_%s' % (report.id, account.id),
+                        'r_id': report.id,
+                        'a_id': account.id,
+                        'parent': report.id,
                         'name': account.code + ' ' + account.name,
-                        'balance': value['balance'] * int(report.sign) or 0.0,
+                        'balance': self._get_cash_flow_account_line_balance(
+                            report, value) * int(report.sign) or 0.0,
                         'type': 'account',
                         'level': report.display_detail ==
                                  'detail_with_hierarchy' and 4,
-                        'account_type': account.internal_type,
+                        'account_type': account.account_type,
                     }
                     if data['debit_credit']:
                         vals['debit'] = value['debit']
@@ -196,6 +270,14 @@ class ReportFinancial(models.AbstractModel):
                 lines += sorted(sub_lines,
                                 key=lambda sub_line: sub_line['name'])
         return lines
+
+    def _get_cash_flow_account_line_balance(self, report, value):
+        if self._is_cash_in_report(report):
+            return value.get('credit') if self._uses_fallback_balance_sign(report) else value.get('debit')
+        if self._is_cash_out_report(report):
+            amount = value.get('debit') if self._uses_fallback_balance_sign(report) else value.get('credit')
+            return -amount
+        return value.get('balance')
 
     @api.model
     def _get_report_values(self, docids, data=None):

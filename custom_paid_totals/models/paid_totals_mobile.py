@@ -6,40 +6,6 @@ from collections import defaultdict
 from dateutil.relativedelta import relativedelta
 
 
-class AccountJournal(models.Model):
-    _inherit = 'account.journal'
-
-    # Ajout du type mobile
-    type = fields.Selection(
-        selection_add=[('mobile', 'Mobile')],
-        ondelete={'mobile': 'cascade'}
-    )
-
-    @api.model
-    def create(self, vals):
-        journal = super(AccountJournal, self).create(vals)
-
-        if vals.get('type') == 'mobile':
-            manual_out = self.env.ref('account.account_payment_method_manual_out', raise_if_not_found=False)
-            manual_in = self.env.ref('account.account_payment_method_manual_in', raise_if_not_found=False)
-
-            if manual_out:
-                journal.payment_method_line_ids.create({
-                    'journal_id': journal.id,
-                    'payment_method_id': manual_out.id,
-                    'payment_type': 'outbound'
-                })
-
-            if manual_in:
-                journal.payment_method_line_ids.create({
-                    'journal_id': journal.id,
-                    'payment_method_id': manual_in.id,
-                    'payment_type': 'inbound'
-                })
-
-        return journal
-
-
 # -------------------------
 # Journal Mobile principal
 # -------------------------

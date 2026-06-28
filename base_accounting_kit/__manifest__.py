@@ -90,6 +90,13 @@
         'wizard/account_lock_date.xml',
         'views/account_payment_view.xml',
     ],
+    'assets': {
+        'web.assets_backend': [
+            'base_accounting_kit/static/src/components/financial_report/financial_report.js',
+            'base_accounting_kit/static/src/components/financial_report/financial_report.xml',
+            'base_accounting_kit/static/src/components/financial_report/financial_report.scss',
+        ],
+    },
     'license': 'LGPL-3',
     'images': ['static/description/banner.gif'],
     'installable': True,

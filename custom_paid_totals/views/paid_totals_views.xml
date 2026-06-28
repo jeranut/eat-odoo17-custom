@@ -39,10 +39,17 @@
         <field name="arch" type="xml">
             <form string="Totaux Journaliers">
                 <header>
+                    <field name="etat" invisible="1"/>
+                    <field name="show_advance_payment_button" invisible="1"/>
                     <button name="action_update_totals_wizard"
                             type="object"
                             string="AJOUT RECETTE DU JOUR"
                             class="btn-primary"/>
+                    <button name="action_open_advance_payment_wizard"
+                            type="object"
+                            string="AVANCE SUR PAYMENT"
+                            class="btn-primary"
+                            invisible="etat == 'cloturer' or not show_advance_payment_button"/>
                     <button name="action_update_totals"
                             type="object"
                             string="UPDATE"

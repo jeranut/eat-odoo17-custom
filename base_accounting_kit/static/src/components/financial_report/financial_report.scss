@@ -1,0 +1,440 @@
+.o_bak_financial_report {
+    background: #f5f6f8;
+    min-height: 100%;
+}
+
+.bak-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    background: #fff;
+    border-bottom: 1px solid #d8dadd;
+}
+
+.bak-left,
+.bak-filterbar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.bak-filterbar {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.bak-dropdown {
+    position: relative;
+}
+
+.bak-filter-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 34px;
+    padding: 6px 10px;
+    border: 1px solid #d8dadd;
+    border-radius: 4px;
+    background: #f0f1f3;
+    color: #1f2933;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.bak-filter-button:hover,
+.bak-filter-button.active {
+    background: #e5e7eb;
+    border-color: #b8bcc2;
+}
+
+.bak-menu {
+    position: absolute;
+    z-index: 10;
+    top: calc(100% + 4px);
+    right: 0;
+    min-width: 230px;
+    max-width: 360px;
+    padding: 6px;
+    background: #fff;
+    border: 1px solid #d8dadd;
+    border-radius: 4px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.bak-menu button,
+.bak-check-row,
+.bak-menu-field {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 30px;
+    padding: 6px 8px;
+    border: 0;
+    border-radius: 3px;
+    background: transparent;
+    color: #1f2933;
+    text-align: left;
+    font-size: 13px;
+}
+
+.bak-menu button:hover,
+.bak-check-row:hover {
+    background: #f3f4f6;
+}
+
+.bak-menu button.active,
+.bak-check-row.active {
+    background: #e7f0ff;
+    color: #0f4c81;
+    font-weight: 700;
+}
+
+.bak-check-row {
+    gap: 8px;
+    cursor: pointer;
+}
+
+.bak-check-row span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.bak-menu-field {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 4px;
+    font-weight: 600;
+}
+
+.bak-menu-field input {
+    width: 100%;
+    border: 1px solid #d8dadd;
+    border-radius: 3px;
+    padding: 4px 6px;
+}
+
+.bak-menu-title {
+    display: block;
+    padding: 4px 8px;
+    color: #6b7280;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.bak-menu-separator {
+    height: 1px;
+    margin: 6px 4px;
+    background: #e5e7eb;
+}
+
+.bak-journal-menu {
+    min-width: 300px;
+    max-height: 340px;
+    overflow: auto;
+}
+
+.bak-empty-menu {
+    padding: 10px 8px;
+    color: #6b7280;
+    font-size: 13px;
+}
+
+.bak-page-wrapper {
+    display: flex;
+    justify-content: center;
+    padding: 28px;
+}
+
+.bak-page {
+    background: #fff;
+    width: 100%;
+    max-width: 960px;
+    min-height: 850px;
+    padding: 28px 34px;
+    border: 1px solid #d8dadd;
+    border-radius: 4px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
+}
+
+.bak-report-title {
+    text-align: center;
+    margin-bottom: 18px;
+}
+
+.bak-report-title h2 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 700;
+}
+
+.bak-report-title div {
+    margin-top: 4px;
+    color: #5f6368;
+}
+
+.bak-report-meta {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 18px;
+}
+
+.bak-report-meta > div {
+    border: 1px solid #e1e4e8;
+    border-radius: 4px;
+    padding: 8px 10px;
+    background: #fafafa;
+}
+
+.bak-report-meta span {
+    display: block;
+    color: #6b7280;
+    font-size: 11px;
+    text-transform: uppercase;
+}
+
+.bak-report-meta strong {
+    display: block;
+    margin-top: 2px;
+    font-weight: 600;
+}
+
+.bak-columns,
+.bak-line {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 180px;
+    align-items: center;
+}
+
+.bak-columns {
+    padding: 8px 12px;
+    border-top: 1px solid #d8dadd;
+    border-bottom: 1px solid #d8dadd;
+    color: #374151;
+    font-weight: 700;
+}
+
+.bak-columns div:not(:first-child) {
+    text-align: right;
+}
+
+.bak-columns.bak-with-budget,
+.bak-line.bak-with-budget {
+    grid-template-columns: minmax(0, 1fr) 150px 180px;
+}
+
+.bak-line-budget {
+    padding-right: 12px;
+    text-align: right;
+    color: #9aa0a6;
+    font-variant-numeric: tabular-nums;
+}
+
+.bak-line {
+    min-height: 34px;
+    border-bottom: 1px solid #edf0f2;
+    font-size: 13px;
+}
+
+.bak-line-name {
+    display: flex;
+    align-items: center;
+    color: #1f2933;
+    min-width: 0;
+}
+
+.bak-line-amount {
+    padding-right: 12px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.bak-section {
+    margin-top: 16px;
+    background: #e5e7eb;
+    border-top: 1px solid #d1d5db;
+    border-bottom: 1px solid #d1d5db;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.bak-section:first-of-type {
+    margin-top: 0;
+}
+
+.bak-subsection,
+.bak-total-line {
+    font-weight: 700;
+}
+
+.bak-account-line {
+    color: #374151;
+    font-size: 12.5px;
+}
+
+.bak-negative {
+    color: #c0392b;
+    font-weight: 600;
+}
+
+.bak-zero {
+    color: #9aa0a6;
+}
+
+.bak-caret,
+.bak-caret-spacer {
+    width: 20px;
+    flex: 0 0 20px;
+    margin-right: 4px;
+}
+
+.bak-caret {
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: #6b7280;
+    line-height: 1;
+    text-align: center;
+}
+
+.bak-loading {
+    padding: 25px;
+    text-align: center;
+    color: #777;
+}
+
+.bak-cash-summary {
+    margin: 18px 0 20px;
+    border: 1px solid #d8dadd;
+    border-radius: 4px;
+    background: #fbfbfc;
+}
+
+.bak-cash-summary-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    border-bottom: 1px solid #e1e4e8;
+}
+
+.bak-cash-summary-header span {
+    color: #6b7280;
+    font-size: 12px;
+}
+
+.bak-cash-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1px;
+    background: #e1e4e8;
+}
+
+.bak-cash-summary-grid > div {
+    min-width: 0;
+    padding: 10px 12px;
+    background: #fff;
+}
+
+.bak-cash-summary-grid span {
+    display: block;
+    color: #6b7280;
+    font-size: 11px;
+    text-transform: uppercase;
+}
+
+.bak-cash-summary-grid strong {
+    display: block;
+    margin-top: 4px;
+    font-variant-numeric: tabular-nums;
+}
+
+.bak-cash-detail-table {
+    border-top: 1px solid #e1e4e8;
+}
+
+.bak-cash-detail-head,
+.bak-cash-detail-row {
+    display: grid;
+    grid-template-columns: 120px minmax(0, 1fr) repeat(3, 120px);
+    gap: 8px;
+    align-items: center;
+    padding: 8px 12px;
+}
+
+.bak-cash-detail-head {
+    color: #374151;
+    font-size: 12px;
+    font-weight: 700;
+    background: #f3f4f6;
+}
+
+.bak-cash-detail-row {
+    border-top: 1px solid #edf0f2;
+    font-size: 12.5px;
+}
+
+.bak-cash-detail-head div:nth-child(n + 3),
+.bak-cash-detail-row div:nth-child(n + 3) {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.bak-cash-detail-row small {
+    display: block;
+    color: #6b7280;
+}
+
+@media (max-width: 768px) {
+    .bak-toolbar,
+    .bak-report-meta {
+        display: block;
+    }
+
+    .bak-left,
+    .bak-filterbar {
+        flex-wrap: wrap;
+        justify-content: flex-start;
+        margin-bottom: 8px;
+    }
+
+    .bak-menu {
+        left: 0;
+        right: auto;
+    }
+
+    .bak-page-wrapper {
+        padding: 12px;
+    }
+
+    .bak-page {
+        padding: 18px 14px;
+    }
+
+    .bak-columns,
+    .bak-line {
+        grid-template-columns: minmax(0, 1fr) 120px;
+    }
+
+    .bak-columns.bak-with-budget,
+    .bak-line.bak-with-budget {
+        grid-template-columns: minmax(0, 1fr) 90px 120px;
+    }
+
+    .bak-cash-summary-header,
+    .bak-cash-summary-grid,
+    .bak-cash-detail-head,
+    .bak-cash-detail-row {
+        display: block;
+    }
+
+    .bak-cash-detail-head div,
+    .bak-cash-detail-row div {
+        margin-bottom: 4px;
+        text-align: left !important;
+    }
+}

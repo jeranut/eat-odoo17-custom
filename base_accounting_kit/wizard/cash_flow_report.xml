@@ -49,9 +49,19 @@
         <field name="context"
                eval="{'default_account_report_id':ref('base_accounting_kit.account_financial_report_cash_flow0')}"/>
     </record>
+    <record id="action_cash_flow_html" model="ir.actions.client">
+        <field name="name">Tableau des flux de trésorerie</field>
+        <field name="tag">base_accounting_kit.financial_report</field>
+        <field name="params" eval="{
+            'report_name': 'Cash Flow Statement',
+            'report_xml_id': 'base_accounting_kit.account_financial_report_cash_flow0',
+        }"/>
+        <field name="context"
+               eval="{'default_account_report_id': ref('base_accounting_kit.account_financial_report_cash_flow0')}"/>
+    </record>
     <menuitem id="menu_account_cash_flow_report"
               name="Cash Flow Statement"
               sequence="5"
-              action="action_cash_flow_report"
+              action="action_cash_flow_html"
               parent="base_accounting_kit.account_reports_generic_statements"/>
 </odoo>

@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="base_accounting_kit.FinancialReport">
+        <div t-att-class="reportClass()">
+
+            <div class="bak-toolbar">
+                <div class="bak-left">
+                    <button class="btn btn-primary" t-on-click="this.printPdf">PDF</button>
+                    <button class="btn btn-secondary" t-att-disabled="!state.xlsxActionXmlId" t-on-click="this.exportXlsx">XLSX</button>
+                    <strong t-esc="state.title"/>
+                </div>
+
+                <div class="bak-filterbar">
+                    <div class="bak-dropdown">
+                        <button class="bak-filter-button" type="button" t-on-click="() => this.toggleDropdown('date')">
+                            <i class="fa fa-calendar"/>
+                            <span t-esc="dateButtonLabel()"/>
+                        </button>
+                        <div t-if="this.isDropdownOpen('date')" class="bak-menu bak-date-menu">
+                            <button type="button" t-on-click="() => this.selectDatePreset('today')">Aujourd’hui</button>
+                            <button type="button" t-on-click="() => this.selectDatePreset('month_end')">Fin du mois</button>
+                            <button type="button" t-on-click="() => this.selectDatePreset('quarter_end')">Fin du trimestre</button>
+                            <button type="button" t-on-click="() => this.selectDatePreset('year_end')">Fin de l’année</button>
+                            <div class="bak-menu-separator"/>
+                            <label class="bak-menu-field">
+                                Date spécifique
+                                <input type="date" t-att-value="state.dateTo" t-on-change="this.onSpecificDateChange"/>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="bak-dropdown">
+                        <button t-att-class="state.comparisonMode !== 'none' ? 'bak-filter-button active' : 'bak-filter-button'" type="button" t-on-click="() => this.toggleDropdown('comparison')">
+                            <i class="fa fa-percent"/>
+                            <span t-esc="comparisonButtonLabel()"/>
+                        </button>
+                        <div t-if="this.isDropdownOpen('comparison')" class="bak-menu">
+                            <button type="button" t-att-class="state.comparisonMode === 'none' ? 'active' : ''" t-on-click="() => this.setComparisonMode('none')">Aucune comparaison</button>
+                            <button type="button" t-att-class="state.comparisonMode === 'previous_period' ? 'active' : ''" t-on-click="() => this.setComparisonMode('previous_period')">Période précédente</button>
+                            <button type="button" t-att-class="state.comparisonMode === 'previous_year' ? 'active' : ''" t-on-click="() => this.setComparisonMode('previous_year')">Même période que l’exercice passé</button>
+                            <button type="button" t-att-class="state.comparisonMode === 'specific' ? 'active' : ''" t-on-click="() => this.setComparisonMode('specific')">Date spécifique</button>
+                            <div class="bak-menu-separator"/>
+                            <span class="bak-menu-title">Ordre périodes</span>
+                            <button type="button" t-att-class="state.comparisonOrder === 'asc' ? 'active' : ''" t-on-click="() => this.setComparisonOrder('asc')">Ascendant</button>
+                            <button type="button" t-att-class="state.comparisonOrder === 'desc' ? 'active' : ''" t-on-click="() => this.setComparisonOrder('desc')">Descendant</button>
+                        </div>
+                    </div>
+
+                    <div class="bak-dropdown">
+                        <button t-att-class="state.selectedJournalIds.length ? 'bak-filter-button active' : 'bak-filter-button'" type="button" t-on-click="() => this.toggleDropdown('journals')">
+                            <i class="fa fa-book"/>
+                            <span t-esc="state.journalsLabel"/>
+                        </button>
+                        <div t-if="this.isDropdownOpen('journals')" class="bak-menu bak-journal-menu">
+                            <button type="button" t-att-class="!state.selectedJournalIds.length ? 'active' : ''" t-on-click="this.clearJournals">Tous les journaux</button>
+                            <div class="bak-menu-separator"/>
+                            <t t-foreach="state.journals" t-as="journal" t-key="journal.id">
+                                <label t-att-class="isJournalSelected(journal.id) ? 'bak-check-row active' : 'bak-check-row'">
+                                    <input type="checkbox" t-att-checked="isJournalSelected(journal.id)" t-on-change="() => this.toggleJournal(journal.id)"/>
+                                    <span t-esc="journal.name"/>
+                                </label>
+                            </t>
+                            <div t-if="!state.journals.length" class="bak-empty-menu">Aucun journal actif</div>
+                        </div>
+                    </div>
+
+                    <div class="bak-dropdown">
+                        <button t-att-class="state.hideZero ? 'bak-filter-button active' : 'bak-filter-button'" type="button" t-on-click="() => this.toggleDropdown('entries')">
+                            <i class="fa fa-sliders"/>
+                            <span t-esc="state.targetMoveLabel"/>
+                        </button>
+                        <div t-if="this.isDropdownOpen('entries')" class="bak-menu">
+                            <button type="button" t-att-class="state.targetMove === 'all' ? 'active' : ''" t-on-click="() => this.setTargetMove('all')">Écritures brouillon</button>
+                            <button type="button" t-att-class="state.targetMove === 'posted' ? 'active' : ''" t-on-click="() => this.setTargetMove('posted')">Pièces comptabilisées</button>
+                            <div class="bak-menu-separator"/>
+                            <button type="button" t-on-click="this.unfoldAll">Tout déplier</button>
+                            <button type="button" t-att-class="state.hideZero ? 'active' : ''" t-on-click="this.toggleHideZero">Masquer les lignes à 0</button>
+                            <button type="button" t-att-class="state.horizontalSplit ? 'active' : ''" t-on-click="this.toggleHorizontalSplit">Diviser horizontalement</button>
+                        </div>
+                    </div>
+
+                    <div class="bak-dropdown">
+                        <button t-att-class="state.showBudget ? 'bak-filter-button active' : 'bak-filter-button'" type="button" t-on-click="this.toggleBudget">
+                            <i class="fa fa-bar-chart"/>
+                            <span>Budget</span>
+                        </button>
+                    </div>
+
+                    <div class="bak-dropdown">
+                        <button class="bak-filter-button" type="button" t-on-click="() => this.toggleDropdown('currency')">
+                            <i class="fa fa-bar-chart"/>
+                            <span t-esc="currencyButtonLabel()"/>
+                        </button>
+                        <div t-if="this.isDropdownOpen('currency')" class="bak-menu bak-currency-menu">
+                            <button type="button" t-att-class="state.currencyFormat === 'full' ? 'active' : ''" t-on-click="() => this.setCurrencyFormat('full')">En .Ar</button>
+                            <button type="button" t-att-class="state.currencyFormat === 'ar' ? 'active' : ''" t-on-click="() => this.setCurrencyFormat('ar')">En Ar</button>
+                            <button type="button" t-att-class="state.currencyFormat === 'kar' ? 'active' : ''" t-on-click="() => this.setCurrencyFormat('kar')">En KAr</button>
+                            <button type="button" t-att-class="state.currencyFormat === 'mar' ? 'active' : ''" t-on-click="() => this.setCurrencyFormat('mar')">En MAr</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bak-page-wrapper">
+                <div class="bak-page">
+
+                    <div class="bak-report-title">
+                        <h2 t-esc="state.title"/>
+                        <div t-esc="state.companyName"/>
+                    </div>
+
+                    <div class="bak-report-meta">
+                        <div>
+                            <span>Date</span>
+                            <strong t-esc="formatDate(state.dateTo)"/>
+                        </div>
+                        <div>
+                            <span>Journaux</span>
+                            <strong t-esc="state.journalsLabel"/>
+                        </div>
+                        <div>
+                            <span>Pièces</span>
+                            <strong t-esc="state.targetMoveLabel"/>
+                        </div>
+                        <div>
+                            <span>Format</span>
+                            <strong t-esc="currencyButtonLabel()"/>
+                        </div>
+                    </div>
+
+                    <div t-if="state.customCashData" class="bak-cash-summary">
+                        <div class="bak-cash-summary-header">
+                            <strong t-esc="state.customCashData.title"/>
+                            <span>Lecture opérationnelle hors calcul comptable</span>
+                        </div>
+                        <div class="bak-cash-summary-grid">
+                            <div>
+                                <span>Solde initial</span>
+                                <strong t-esc="formatAmount(state.customCashData.opening_balance)"/>
+                            </div>
+                            <div>
+                                <span>Flux entrants opérationnels</span>
+                                <strong t-esc="formatAmount(state.customCashData.total_cash_in)"/>
+                            </div>
+                            <div>
+                                <span>Flux sortants opérationnels</span>
+                                <strong t-esc="formatAmount(state.customCashData.total_cash_out)"/>
+                            </div>
+                            <div>
+                                <span>Flux net</span>
+                                <strong t-esc="formatAmount(state.customCashData.net_cash_flow)"/>
+                            </div>
+                            <div>
+                                <span>Ajustements / corrections</span>
+                                <strong t-esc="formatAmount(state.customCashData.adjustments)"/>
+                            </div>
+                            <div>
+                                <span>Solde de trésorerie journalier</span>
+                                <strong t-esc="formatAmount(state.customCashData.closing_balance)"/>
+                            </div>
+                        </div>
+                        <div t-if="state.customCashData.details.length" class="bak-cash-detail-table">
+                            <div class="bak-cash-detail-head">
+                                <div>Source</div>
+                                <div>Journal / paiement</div>
+                                <div>Entrants</div>
+                                <div>Sortants</div>
+                                <div>Net</div>
+                            </div>
+                            <t t-foreach="state.customCashData.details" t-as="detail" t-key="detail.key || detail_index">
+                                <div class="bak-cash-detail-row">
+                                    <div t-esc="detail.source"/>
+                                    <div>
+                                        <span t-esc="detail.journal"/>
+                                        <small t-if="detail.payment_type" t-esc="detail.payment_type"/>
+                                    </div>
+                                    <div t-esc="formatAmount(detail.cash_in)"/>
+                                    <div t-esc="formatAmount(detail.cash_out)"/>
+                                    <div t-esc="formatAmount(detail.balance)"/>
+                                </div>
+                            </t>
+                        </div>
+                    </div>
+
+                    <div t-att-class="state.showBudget ? 'bak-columns bak-with-budget' : 'bak-columns'">
+                        <div>Libellé</div>
+                        <div t-if="state.showBudget">Budget</div>
+                        <div>Solde</div>
+                    </div>
+
+                    <t t-if="state.loading">
+                        <div class="bak-loading">Chargement du rapport...</div>
+                    </t>
+
+                    <t t-if="state.error">
+                        <div class="alert alert-danger" t-esc="state.error"/>
+                    </t>
+
+                    <t t-if="!state.loading and !state.error">
+                        <t t-foreach="visibleLines()" t-as="line" t-key="line.unique_key || line_index">
+                            <div t-att-class="lineClass(line) + (state.showBudget ? ' bak-with-budget' : '')">
+                                <div class="bak-line-name" t-att-style="'padding-left:' + paddingLeft(line)">
+                                    <button t-if="hasChildren(line)"
+                                            class="bak-caret"
+                                            type="button"
+                                            t-on-click="() => this.toggleLine(line)">
+                                        <t t-if="state.unfolded[line.id]">▾</t>
+                                        <t t-else="">▸</t>
+                                    </button>
+                                    <span t-if="!hasChildren(line)" class="bak-caret-spacer"/>
+                                    <span t-esc="line.name"/>
+                                </div>
+                                <div t-if="state.showBudget" class="bak-line-budget">-</div>
+                                <div t-att-class="amountClass(line)">
+                                    <t t-esc="formatAmount(line.balance)"/>
+                                </div>
+                            </div>
+                        </t>
+                    </t>
+
+                </div>
+            </div>
+
+        </div>
+    </t>
+
+</templates>

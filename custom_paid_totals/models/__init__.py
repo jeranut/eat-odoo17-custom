@@ -8,4 +8,8 @@ from . import paid_totals_mobile
 from . import account_payment_mobile
 from . import add_journal_pos
 from . import treasury_analysis_report
+from . import res_company
+from . import res_config_settings
+from . import advance_payment
+from . import advance_payment_register
 #from . import account_payment_register
